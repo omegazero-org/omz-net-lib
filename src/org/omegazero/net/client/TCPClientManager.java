@@ -79,7 +79,7 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 			socketChannel.bind(params.getLocal());
 
 		super.startRegister();
-		socketChannel.register(super.selector, SelectionKey.OP_CONNECT | SelectionKey.OP_READ).attach(conn);
+		socketChannel.register(super.selector, SelectionKey.OP_CONNECT).attach(conn);
 		super.endRegister();
 		return conn;
 	}
@@ -94,13 +94,14 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 	protected void handleSelectedKey(SelectionKey key) throws IOException {
 		Objects.requireNonNull(key.attachment(), "SelectionKey attachment is null");
 		if(!(key.attachment() instanceof InetConnection))
-			throw new RuntimeException("SelectionKey attachment is of type " + (key.attachment() != null ? key.attachment().getClass().getName() : null)
-					+ ", but expected type " + InetConnection.class.getName());
+			throw new RuntimeException(
+					"SelectionKey attachment is of type " + key.attachment().getClass().getName() + ", but expected type " + InetConnection.class.getName());
 		InetConnection conn = (InetConnection) key.attachment();
 		if(key.isConnectable()){
 			SocketChannel channel = (SocketChannel) key.channel();
 			try{
 				if(channel.finishConnect()){
+					key.interestOps(SelectionKey.OP_READ);
 					this.handleConnect(conn);
 				}else
 					throw new IOException("Socket channel was marked as connectable but finishConnect returned false");
