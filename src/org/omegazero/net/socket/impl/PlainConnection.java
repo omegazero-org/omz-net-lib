@@ -53,7 +53,7 @@ public class PlainConnection extends InetSocketConnection {
 				}else
 					return null;
 			}
-		}catch(Throwable e){
+		}catch(Exception e){
 			super.handleError(e);
 		}
 		// error or read returned below 0 (eof)

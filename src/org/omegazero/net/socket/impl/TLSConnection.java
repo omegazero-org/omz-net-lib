@@ -15,9 +15,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.function.Consumer;
 
 import javax.net.ssl.SNIHostName;
@@ -30,9 +28,13 @@ import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLHandshakeException;
 
+import org.omegazero.common.util.PropertyUtil;
 import org.omegazero.net.socket.InetSocketConnection;
 
 public class TLSConnection extends InetSocketConnection {
+
+	private static final int minTLSVersion = PropertyUtil.getInt("org.omegazero.net.tls.minTLSVersion", 2);
+	private static final boolean disableWeakCiphers = PropertyUtil.getBoolean("org.omegazero.net.tls.disableWeakCiphers", false);
 
 	private final SSLContext sslContext;
 	private final Consumer<Runnable> taskRunner;
@@ -58,7 +60,10 @@ public class TLSConnection extends InetSocketConnection {
 		this.taskRunner = taskRunner;
 		this.alpnNames = alpnNames;
 
-		this.sslEngine = this.sslContext.createSSLEngine();
+		if(super.getRemoteAddress() != null)
+			this.sslEngine = this.sslContext.createSSLEngine(super.getRemoteAddress().getAddress().getHostAddress(), super.getRemoteAddress().getPort());
+		else
+			this.sslEngine = this.sslContext.createSSLEngine();
 		this.sslEngine.setUseClientMode(client);
 		this.sslEngine.setHandshakeApplicationProtocolSelector((sslEngine, list) -> {
 			if(TLSConnection.this.alpnNames != null){
@@ -71,15 +76,33 @@ public class TLSConnection extends InetSocketConnection {
 			return null;
 		});
 
-		// GCM ciphers are broken or something (or im doing something wrong which is far more likely)
-		// if data is received immediately after the handshake completed, the next read call will cause a "AEADBadTagException: Tag mismatch!"
-		String[] ciphersList = this.sslEngine.getEnabledCipherSuites();
-		List<String> ciphers = new ArrayList<>(ciphersList.length);
-		for(String s : ciphersList){
-			if(!s.contains("GCM"))
-				ciphers.add(s);
+		if(minTLSVersion >= 0){
+			String[] protoList = this.sslEngine.getEnabledProtocols();
+			int ti = 0;
+			for(int i = 0; i < protoList.length; i++){
+				if(TLSConnection.isMinTLSVersion(protoList[i]))
+					protoList[ti++] = protoList[i];
+			}
+			if(ti < protoList.length){
+				String[] nprotoList = new String[ti];
+				System.arraycopy(protoList, 0, nprotoList, 0, ti);
+				this.sslEngine.setEnabledProtocols(nprotoList);
+			}
 		}
-		this.sslEngine.setEnabledCipherSuites(ciphers.toArray(new String[ciphers.size()]));
+
+		if(disableWeakCiphers){
+			String[] cipherList = this.sslEngine.getEnabledCipherSuites();
+			int ti = 0;
+			for(int i = 0; i < cipherList.length; i++){
+				if(!TLSConnection.isWeakCipher(cipherList[i]))
+					cipherList[ti++] = cipherList[i];
+			}
+			if(ti < cipherList.length){
+				String[] ncipherList = new String[ti];
+				System.arraycopy(cipherList, 0, ncipherList, 0, ti);
+				this.sslEngine.setEnabledCipherSuites(ncipherList);
+			}
+		}
 
 		if(requestedServerNames != null){
 			SNIServerName[] serverNames = new SNIServerName[requestedServerNames.length];
@@ -108,12 +131,22 @@ public class TLSConnection extends InetSocketConnection {
 			if(!super.isConnected())
 				return null;
 			super.readBuf.clear();
-			if(handshakeComplete){
-				return this.readApplicationData();
+			if(this.handshakeComplete){
+				int read = super.readFromSocket();
+				if(read > 0){
+					super.readBuf.flip();
+					return this.readApplicationData();
+				}else if(read < 0){
+					this.close();
+				}
 			}else{
 				this.doTLSHandshake();
+				super.readBuf.flip();
+				if(this.handshakeComplete && super.readBuf.hasRemaining()){
+					return this.readApplicationData();
+				}
 			}
-		}catch(Throwable e){
+		}catch(Exception e){
 			super.handleError(e);
 		}
 		return null;
@@ -172,25 +205,19 @@ public class TLSConnection extends InetSocketConnection {
 
 
 	private byte[] readApplicationData() throws IOException {
-		int read = super.readFromSocket();
-		if(read > 0){
-			super.readBuf.flip();
-			SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
-			if(result.getStatus() == Status.CLOSED)
-				this.close();
-			else if(result.getStatus() == Status.OK){
-				this.readBufUnwrapped.flip();
-				if(this.readBufUnwrapped.hasRemaining()){
-					byte[] a = new byte[this.readBufUnwrapped.remaining()];
-					this.readBufUnwrapped.get(a);
-					this.readBufUnwrapped.compact();
-					return a;
-				}
-			}else
-				throw new SSLException("Read SSL unwrap failed: " + result.getStatus());
-		}else if(read < 0){
+		SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
+		if(result.getStatus() == Status.CLOSED)
 			this.close();
-		}
+		else if(result.getStatus() == Status.OK){
+			this.readBufUnwrapped.flip();
+			if(this.readBufUnwrapped.hasRemaining()){
+				byte[] a = new byte[this.readBufUnwrapped.remaining()];
+				this.readBufUnwrapped.get(a);
+				this.readBufUnwrapped.compact();
+				return a;
+			}
+		}else
+			throw new SSLException("Read SSL unwrap failed: " + result.getStatus());
 		return null;
 	}
 
@@ -205,7 +232,6 @@ public class TLSConnection extends InetSocketConnection {
 		while(true){
 			if(status == HandshakeStatus.NEED_UNWRAP){
 				int read = super.readFromSocket();
-
 				if(read < 0)
 					throw new SSLHandshakeException("Socket disconnected before handshake completed");
 				super.readBuf.flip();
@@ -241,5 +267,23 @@ public class TLSConnection extends InetSocketConnection {
 			}else
 				throw new SSLHandshakeException("Unexpected engine status: " + status);
 		}
+	}
+
+
+	private static boolean isMinTLSVersion(String name) {
+		if(name.startsWith("SSL"))
+			return false;
+		int di = name.indexOf('.');
+		int minorV;
+		if(di < 0) // TLSv1[.0]
+			minorV = 0;
+		else
+			minorV = name.charAt(di + 1) - 48; // ASCII number 0d48 if '0'
+		return minorV >= minTLSVersion;
+	}
+
+	private static boolean isWeakCipher(String name) {
+		// this is only a few of the cipher families considered insecure, but this should cover most or all of ciphers in java
+		return name.contains("CBC") || name.contains("ECDH_") || name.contains("RENEGOTIATION") || name.startsWith("TLS_RSA_WITH_AES_");
 	}
 }
