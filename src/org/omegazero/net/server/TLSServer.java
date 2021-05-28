@@ -33,6 +33,7 @@ public class TLSServer extends TCPServer {
 	private static final Logger logger = LoggerUtil.createLogger();
 
 	private final SSLContext sslContext;
+	private final Consumer<Runnable> sslWorker;
 
 	private String[] supportedApplicationLayerProtocols = null;
 
@@ -44,16 +45,24 @@ public class TLSServer extends TCPServer {
 	public TLSServer(Collection<Integer> ports, SSLContext sslContext) {
 		super(ports);
 		this.sslContext = sslContext;
+		this.sslWorker = super.worker;
 	}
 
 	/**
 	 * 
 	 * @param sslContext The SSL context to be used by the server
+	 * @param sslWorker  An alternative worker for tasks by <code>SSLEngine</code> (see {@link javax.net.ssl.SSLEngine#getDelegatedTask()}). Uses instance passed to
+	 *                   <b>worker</b> if <code>null</code>
 	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
 	 */
-	public TLSServer(String bindAddress, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout, SSLContext sslContext) {
+	public TLSServer(String bindAddress, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout, SSLContext sslContext,
+			Consumer<Runnable> sslWorker) {
 		super(bindAddress, ports, backlog, worker, idleTimeout);
 		this.sslContext = sslContext;
+		if(sslWorker != null)
+			this.sslWorker = sslWorker;
+		else
+			this.sslWorker = super.worker;
 	}
 
 
@@ -81,7 +90,7 @@ public class TLSServer extends TCPServer {
 	@Override
 	protected InetConnection handleConnection(SocketChannel socketChannel) throws IOException {
 		InetConnection conn = new TLSConnection(socketChannel, this.sslContext, false, (r) -> {
-			TLSServer.super.worker.accept(() -> {
+			TLSServer.this.sslWorker.accept(() -> {
 				r.run();
 			});
 		}, this.supportedApplicationLayerProtocols);
