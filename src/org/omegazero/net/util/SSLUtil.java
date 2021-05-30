@@ -20,10 +20,11 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Scanner;
 
 import javax.net.ServerSocketFactory;
@@ -46,7 +47,7 @@ public final class SSLUtil {
 
 	public static SSLContext getSSLContextFromKeyStore(String filename, String password, String keypassword) throws GeneralSecurityException, IOException {
 		if(filename == null)
-			throw new IllegalArgumentException("Tried to create a secure server socket factory but filename is null");
+			throw new IllegalArgumentException("Tried to create a SSLContext but filename is null");
 		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
 		keyStore.load(Files.newInputStream(Paths.get(filename)), password.toCharArray());
 
@@ -61,15 +62,14 @@ public final class SSLUtil {
 
 	public static SSLContext getSSLContextFromPEM(String keyFile, String certFile) throws GeneralSecurityException, IOException {
 		if(keyFile == null || certFile == null)
-			throw new IllegalArgumentException("Tried to create a secure server socket factory but a filename is null");
+			throw new IllegalArgumentException("Tried to create a SSLContext but a filename is null");
 
 		PrivateKey key = SSLUtil.loadPrivateKeyFromPEM(keyFile);
-		X509Certificate cert = SSLUtil.loadCertificateFromPEM(certFile);
+		X509Certificate[] cert = SSLUtil.loadCertificatesFromPEM(certFile);
 
 		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
 		keyStore.load(null, null);
-		keyStore.setCertificateEntry("certificate", cert);
-		keyStore.setKeyEntry("private-key", key, "password".toCharArray(), new Certificate[] { cert });
+		keyStore.setKeyEntry("private-key", key, "password".toCharArray(), cert);
 
 		KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
 		keyManagerFactory.init(keyStore, "password".toCharArray());
@@ -88,24 +88,31 @@ public final class SSLUtil {
 	}
 
 
-	public static byte[] readCertificatePEM(String data) {
-		StringBuilder sb = new StringBuilder();
+	public static List<byte[]> readCertificatePEM(String data) throws IOException {
 		Scanner scanner = new Scanner(data);
-		byte[] rdata = null;
+		List<byte[]> certs = new LinkedList<>();
+		StringBuilder sb = new StringBuilder();
 		while(scanner.hasNextLine()){
-			String line = scanner.nextLine();
-			if(line.contains("-----BEGIN CERTIFICATE-----")){
+			String line = scanner.nextLine().trim();
+			if(line.length() < 1)
 				continue;
+
+			if(line.contains("-----BEGIN CERTIFICATE-----")){
+				sb = new StringBuilder();
 			}else if(line.contains("-----END CERTIFICATE-----")){
-				rdata = Base64.getDecoder().decode(sb.toString());
-				break;
+				certs.add(Base64.getDecoder().decode(sb.toString()));
+				sb = null;
+			}else if(sb != null){
+				sb.append(line);
+			}else{
+				scanner.close();
+				throw new IOException("Unexpected data between certificates");
 			}
-			sb.append(line.trim());
 		}
 		scanner.close();
-		if(rdata == null)
-			throw new RuntimeException("Invalid PEM certificate format");
-		return rdata;
+		if(sb != null)
+			throw new IOException("Incomplete certificate at end of file");
+		return certs;
 	}
 
 
@@ -116,10 +123,26 @@ public final class SSLUtil {
 	}
 
 	public static X509Certificate loadCertificateFromPEM(String certFile) throws GeneralSecurityException, IOException {
-		String certFileData = new String(Files.readAllBytes(Paths.get(certFile)));
 		CertificateFactory cf = CertificateFactory.getInstance("X.509");
-		InputStream tlsStream = new ByteArrayInputStream(SSLUtil.readCertificatePEM(certFileData));
-		X509Certificate cert = (X509Certificate) cf.generateCertificate(tlsStream);
-		return cert;
+		String certFileData = new String(Files.readAllBytes(Paths.get(certFile)));
+		List<byte[]> certData = SSLUtil.readCertificatePEM(certFileData);
+		if(certData.size() > 1)
+			throw new IOException("Expected single certificate in file '" + certFile + "' but received " + certData.size());
+		byte[] cd = certData.get(0);
+		InputStream cdstream = new ByteArrayInputStream(cd);
+		return (X509Certificate) cf.generateCertificate(cdstream);
+	}
+
+	public static X509Certificate[] loadCertificatesFromPEM(String certFile) throws GeneralSecurityException, IOException {
+		CertificateFactory cf = CertificateFactory.getInstance("X.509");
+		String certFileData = new String(Files.readAllBytes(Paths.get(certFile)));
+		List<byte[]> certData = SSLUtil.readCertificatePEM(certFileData);
+		X509Certificate[] certs = new X509Certificate[certData.size()];
+		int i = 0;
+		for(byte[] cd : certData){
+			InputStream cdstream = new ByteArrayInputStream(cd);
+			certs[i++] = (X509Certificate) cf.generateCertificate(cdstream);
+		}
+		return certs;
 	}
 }
