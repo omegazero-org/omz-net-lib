@@ -66,14 +66,16 @@ public abstract class InetSocketConnection extends InetConnection {
 			this.ensureNonBlocking();
 			if(this.remoteAddress == null)
 				throw new UnsupportedOperationException("Cannot connect because no remote address was specified");
-			this.socket.connect(this.remoteAddress);
-			if(timeout > 0)
+			boolean imm = this.socket.connect(this.remoteAddress);
+			if(imm)
+				super.localConnect();
+			else if(timeout > 0)
 				this.connectTimeout = Tasks.timeout((args) -> {
 					if(!InetSocketConnection.this.isConnected()){ // definitely before this ever connected because this handler gets canceled if socket closes (or errors)
 						InetSocketConnection.this.handleTimeout();
 						InetSocketConnection.this.close();
 					}
-				}, timeout).getId();
+				}, timeout).daemon().getId();
 		}catch(Exception e){
 			super.handleError(e);
 		}

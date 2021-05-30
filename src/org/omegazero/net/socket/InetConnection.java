@@ -26,6 +26,7 @@ public abstract class InetConnection {
 	private Consumer<byte[]> onData;
 	private Runnable onClose;
 	private Consumer<Throwable> onError;
+	private Consumer<InetConnection> onLocalConnect;
 	private Consumer<InetConnection> onLocalClose;
 
 	private InetSocketAddress apparentRemoteAddress;
@@ -226,16 +227,31 @@ public abstract class InetConnection {
 		this.onError = onError;
 	}
 
-	public void setOnLocalClose(Consumer<InetConnection> onLocalClose) {
+	public final void setOnLocalClose(Consumer<InetConnection> onLocalClose) {
 		if(this.onLocalClose != null)
 			throw new IllegalStateException("onLocalClose is already set");
 		this.onLocalClose = onLocalClose;
 	}
 
+	public final void setOnLocalConnect(Consumer<InetConnection> onLocalConnect) {
+		if(this.onLocalConnect != null)
+			throw new IllegalStateException("onLocalConnect is already set");
+		this.onLocalConnect = onLocalConnect;
+	}
+
+
+	protected final void localConnect() {
+		if(this.onLocalConnect != null)
+			this.onLocalConnect.accept(this);
+		else
+			this.handleConnect();
+	}
 
 	protected final void localClose() {
 		if(this.onLocalClose != null)
 			this.onLocalClose.accept(this);
+		else
+			this.handleClose();
 	}
 
 	protected final synchronized void queueWrite(byte[] data) {

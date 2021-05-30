@@ -14,6 +14,8 @@ package org.omegazero.net.client;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -28,6 +30,10 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 
 	private static final Logger logger = LoggerUtil.createLogger();
 
+
+	// the connect() method returns true if the connection is established immediately, *instead* of firing OP_CONNECT. To have both cases look somewhat similar
+	// (ie called by the selectorLoop() thread, asynchronously), this exists for similar reasons why closedConnections in InetConnectionSelector exists. This is a mess, i know.
+	private HashSet<SelectionKey> completedConnections = new HashSet<>();
 
 	protected final Consumer<Runnable> worker;
 
@@ -51,6 +57,12 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 	 * @param conn The {@link InetConnection} object representing the connection that was established
 	 */
 	protected abstract void handleConnect(InetConnection conn) throws IOException;
+
+
+	private void finishConnect(SelectionKey key) throws IOException {
+		key.interestOps(SelectionKey.OP_READ);
+		this.handleConnect((InetConnection) key.attachment());
+	}
 
 
 	@Override
@@ -78,17 +90,31 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 		if(params.getLocal() != null)
 			socketChannel.bind(params.getLocal());
 
-		super.startRegister();
-		socketChannel.register(super.selector, SelectionKey.OP_CONNECT).attach(conn);
-		super.endRegister();
+		SelectionKey key = super.registerChannel(socketChannel, SelectionKey.OP_CONNECT, conn);
+		conn.setOnLocalConnect((c) -> {
+			TCPClientManager.this.completedConnections.add(key);
+		});
 		return conn;
 	}
 
 	@Override
 	public void run() throws IOException {
-		super.selectorLoop();
+		super.runSelectorLoop();
 	}
 
+
+	@Override
+	protected void loopIteration() throws IOException {
+		super.loopIteration();
+		if(this.completedConnections.size() > 0){
+			Iterator<SelectionKey> compIterator = this.completedConnections.iterator();
+			while(compIterator.hasNext()){
+				logger.trace("Handling local connect");
+				this.finishConnect(compIterator.next());
+				compIterator.remove();
+			}
+		}
+	}
 
 	@Override
 	protected void handleSelectedKey(SelectionKey key) throws IOException {
@@ -101,8 +127,7 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 			SocketChannel channel = (SocketChannel) key.channel();
 			try{
 				if(channel.finishConnect()){
-					key.interestOps(SelectionKey.OP_READ);
-					this.handleConnect(conn);
+					this.finishConnect(key);
 				}else
 					throw new IOException("Socket channel was marked as connectable but finishConnect returned false");
 			}catch(IOException e){

@@ -104,7 +104,7 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 		ServerSocketChannel ssc = ServerSocketChannel.open();
 		ssc.bind(new InetSocketAddress(this.bindAddress, port), this.backlog);
 		ssc.configureBlocking(false);
-		ssc.register(super.selector, SelectionKey.OP_ACCEPT);
+		super.registerChannel(ssc, SelectionKey.OP_ACCEPT);
 		this.serverSockets.add(ssc);
 	}
 
@@ -126,7 +126,7 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 				return;
 			long currentTime = System.currentTimeMillis();
 			try{
-				for(SelectionKey k : super.selector.keys()){
+				for(SelectionKey k : super.selectorKeys()){
 					if(k.attachment() instanceof InetConnection){
 						InetConnection conn = (InetConnection) k.attachment();
 						long delta = currentTime - conn.getLastIOTime();
@@ -158,7 +158,7 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 
 	@Override
 	public void run() throws IOException {
-		super.selectorLoop();
+		super.runSelectorLoop();
 	}
 
 
@@ -180,8 +180,7 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 
 			this.handleConnectionPost(conn);
 
-			// no need to call super.startRegister because we're in handleSelectedKey (not in a select call)
-			socketChannel.register(super.selector, SelectionKey.OP_READ).attach(conn);
+			super.registerChannel(socketChannel, SelectionKey.OP_READ, conn);
 		}else if(key.isReadable() && key.attachment() instanceof InetConnection){
 			InetConnection conn = (InetConnection) key.attachment();
 			byte[] data = conn.read();
