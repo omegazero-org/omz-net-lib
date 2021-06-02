@@ -33,7 +33,6 @@ public class TLSServer extends TCPServer {
 	private static final Logger logger = LoggerUtil.createLogger();
 
 	private final SSLContext sslContext;
-	private final Consumer<Runnable> sslWorker;
 
 	private String[] supportedApplicationLayerProtocols = null;
 
@@ -45,7 +44,6 @@ public class TLSServer extends TCPServer {
 	public TLSServer(Collection<Integer> ports, SSLContext sslContext) {
 		super(ports);
 		this.sslContext = sslContext;
-		this.sslWorker = super.worker;
 	}
 
 	/**
@@ -55,14 +53,9 @@ public class TLSServer extends TCPServer {
 	 *                   <b>worker</b> if <code>null</code>
 	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
 	 */
-	public TLSServer(String bindAddress, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout, SSLContext sslContext,
-			Consumer<Runnable> sslWorker) {
+	public TLSServer(String bindAddress, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout, SSLContext sslContext) {
 		super(bindAddress, ports, backlog, worker, idleTimeout);
 		this.sslContext = sslContext;
-		if(sslWorker != null)
-			this.sslWorker = sslWorker;
-		else
-			this.sslWorker = super.worker;
 	}
 
 
@@ -89,11 +82,7 @@ public class TLSServer extends TCPServer {
 
 	@Override
 	protected InetConnection handleConnection(SocketChannel socketChannel) throws IOException {
-		InetConnection conn = new TLSConnection(socketChannel, this.sslContext, false, (r) -> {
-			TLSServer.this.sslWorker.accept(() -> {
-				r.run();
-			});
-		}, this.supportedApplicationLayerProtocols);
+		InetConnection conn = new TLSConnection(socketChannel, this.sslContext, false, this.supportedApplicationLayerProtocols);
 
 		// see note in PlainTCPServer
 		conn.setOnError((e) -> {

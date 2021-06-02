@@ -11,12 +11,12 @@
  */
 package org.omegazero.net.socket.impl;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
-import java.util.function.Consumer;
 
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIServerName;
@@ -28,16 +28,19 @@ import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLHandshakeException;
 
+import org.omegazero.common.logging.Logger;
+import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.common.util.PropertyUtil;
 import org.omegazero.net.socket.InetSocketConnection;
 
 public class TLSConnection extends InetSocketConnection {
 
+	private static final Logger logger = LoggerUtil.createLogger();
+
 	private static final int minTLSVersion = PropertyUtil.getInt("org.omegazero.net.tls.minTLSVersion", 2);
 	private static final boolean disableWeakCiphers = PropertyUtil.getBoolean("org.omegazero.net.tls.disableWeakCiphers", false);
 
 	private final SSLContext sslContext;
-	private final Consumer<Runnable> taskRunner;
 	private final String[] alpnNames;
 
 	private final SSLEngine sslEngine;
@@ -49,15 +52,14 @@ public class TLSConnection extends InetSocketConnection {
 
 	private String alpnProtocol = null;
 
-	public TLSConnection(SocketChannel socket, SSLContext sslContext, boolean client, Consumer<Runnable> taskRunner, String[] alpnNames) throws IOException {
-		this(socket, null, sslContext, client, taskRunner, alpnNames, null);
+	public TLSConnection(SocketChannel socket, SSLContext sslContext, boolean client, String[] alpnNames) throws IOException {
+		this(socket, null, sslContext, client, alpnNames, null);
 	}
 
-	public TLSConnection(SocketChannel socket, InetSocketAddress remote, SSLContext sslContext, boolean client, Consumer<Runnable> taskRunner, String[] alpnNames,
-			String[] requestedServerNames) throws IOException {
+	public TLSConnection(SocketChannel socket, InetSocketAddress remote, SSLContext sslContext, boolean client, String[] alpnNames, String[] requestedServerNames)
+			throws IOException {
 		super(socket, remote);
 		this.sslContext = sslContext;
-		this.taskRunner = taskRunner;
 		this.alpnNames = alpnNames;
 
 		if(super.getRemoteAddress() != null)
@@ -87,6 +89,7 @@ public class TLSConnection extends InetSocketConnection {
 				String[] nprotoList = new String[ti];
 				System.arraycopy(protoList, 0, nprotoList, 0, ti);
 				this.sslEngine.setEnabledProtocols(nprotoList);
+				logger.trace("Reduced set of enabled TLS versions from ", protoList.length, " to ", ti);
 			}
 		}
 
@@ -101,6 +104,7 @@ public class TLSConnection extends InetSocketConnection {
 				String[] ncipherList = new String[ti];
 				System.arraycopy(cipherList, 0, ncipherList, 0, ti);
 				this.sslEngine.setEnabledCipherSuites(ncipherList);
+				logger.trace("Reduced set of enabled cipher suites from ", cipherList.length, " to ", ti);
 			}
 		}
 
@@ -187,7 +191,28 @@ public class TLSConnection extends InetSocketConnection {
 	@Override
 	public synchronized void close() {
 		this.sslEngine.closeOutbound();
+		this.sslEngine.getSession().invalidate();
+		if(super.isConnected()){
+			try{
+				super.writeBuf.clear();
+				SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
+				super.writeBuf.flip();
+				int written = super.writeToSocket();
+				logger.debug("Wrote SSL close message (", written, " bytes, status ", result.getStatus(), ")");
+			}catch(IOException e){
+				logger.debug("Error while writing SSL close message: ", e.toString());
+			}
+		}
 		super.close();
+	}
+
+	/**
+	 * 
+	 * @return <code>true</code> if {@link InetSocketConnection#isConnected()} returns <code>true</code> and the TLS handshake has completed
+	 */
+	@Override
+	public boolean isConnected() {
+		return super.isConnected() && this.handshakeComplete;
 	}
 
 
@@ -233,7 +258,7 @@ public class TLSConnection extends InetSocketConnection {
 			if(status == HandshakeStatus.NEED_UNWRAP){
 				int read = super.readFromSocket();
 				if(read < 0)
-					throw new SSLHandshakeException("Socket disconnected before handshake completed");
+					throw new EOFException("Socket disconnected before handshake completed");
 				super.readBuf.flip();
 				SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
 				super.readBuf.compact();
@@ -256,12 +281,16 @@ public class TLSConnection extends InetSocketConnection {
 			}else if(status == HandshakeStatus.NEED_TASK){
 				Runnable r;
 				while((r = this.sslEngine.getDelegatedTask()) != null){
-					this.taskRunner.accept(r);
+					// running the tasks in a separate thread currently serves no benefit because this thread will also just block in this loop waiting for the
+					// task to be completed. In that case, this thread might as well just run the task itself
+					r.run();
 				}
 				status = sslEngine.getHandshakeStatus();
 			}else if(status == HandshakeStatus.FINISHED || status == HandshakeStatus.NOT_HANDSHAKING){
 				this.handshakeComplete = true;
 				this.alpnProtocol = this.sslEngine.getApplicationProtocol();
+				logger.debug("SSL Handshake completed: peer=" + super.getRemoteAddress() + ", cipher=" + this.sslEngine.getSession().getCipherSuite(), ", alp=",
+						this.getAlpnProtocol());
 				super.handleConnect();
 				return;
 			}else

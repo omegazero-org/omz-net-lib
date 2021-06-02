@@ -98,7 +98,7 @@ public abstract class InetSocketConnection extends InetConnection {
 	 * @see SocketChannel#isConnected()
 	 */
 	@Override
-	public final boolean isConnected() {
+	public boolean isConnected() {
 		return this.socket.isConnected();
 	}
 

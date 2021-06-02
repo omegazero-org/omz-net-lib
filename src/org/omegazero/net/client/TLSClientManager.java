@@ -72,7 +72,7 @@ public class TLSClientManager extends TCPClientManager {
 
 			SSLContext context = SSLContext.getInstance("TLS");
 			context.init(null, this.trustManagers, null);
-			return new TLSConnection(socketChannel, params.getRemote(), context, true, super.worker, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
+			return new TLSConnection(socketChannel, params.getRemote(), context, true, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
 		}catch(GeneralSecurityException | IOException e){
 			throw new RuntimeException("Error while creating TLS client connection", e);
 		}
