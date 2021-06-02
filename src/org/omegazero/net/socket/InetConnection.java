@@ -12,7 +12,7 @@
 package org.omegazero.net.socket;
 
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -33,7 +33,7 @@ public abstract class InetConnection {
 
 	private Object attachment;
 
-	private List<byte[]> writeQueue = new ArrayList<>();
+	private List<byte[]> writeQueue = new LinkedList<>();
 
 	private boolean closed = false;
 
@@ -239,6 +239,14 @@ public abstract class InetConnection {
 		this.onLocalConnect = onLocalConnect;
 	}
 
+	/**
+	 * 
+	 * @return <code>true</code> if the onConnect event has ever fired
+	 */
+	public final boolean hasConnected() {
+		return this.writeQueue == null; // writeQueue gets deleted in handleConnect/flushWriteQueue
+	}
+
 
 	protected final void localConnect() {
 		if(this.onLocalConnect != null)
@@ -262,7 +270,9 @@ public abstract class InetConnection {
 	}
 
 	private synchronized void flushWriteQueue() {
-		for(byte[] d : this.writeQueue){
+		List<byte[]> wq = this.writeQueue;
+		this.writeQueue = null;
+		for(byte[] d : wq){
 			this.write(d);
 		}
 	}
