@@ -29,6 +29,7 @@ import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.net.common.InetConnectionSelector;
 import org.omegazero.net.common.SyncWorker;
 import org.omegazero.net.socket.InetConnection;
+import org.omegazero.net.socket.InetSocketConnection;
 
 /**
  * TCP server implementation of an {@link InetServer} based on java.nio channels.
@@ -109,9 +110,9 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 	}
 
 
-	protected abstract InetConnection handleConnection(SocketChannel socketChannel) throws IOException;
+	protected abstract InetSocketConnection handleConnection(SelectionKey selectionKey) throws IOException;
 
-	protected void handleConnectionPost(InetConnection connection) {
+	protected void handleConnectionPost(InetSocketConnection connection) {
 	}
 
 
@@ -127,8 +128,8 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 			long currentTime = System.currentTimeMillis();
 			try{
 				for(SelectionKey k : super.selectorKeys()){
-					if(k.attachment() instanceof InetConnection){
-						InetConnection conn = (InetConnection) k.attachment();
+					if(k.attachment() instanceof InetSocketConnection){
+						InetSocketConnection conn = (InetSocketConnection) k.attachment();
 						long delta = currentTime - conn.getLastIOTime();
 						if(delta < 0 || delta > timeout){
 							logger.debug("Idle Timeout: ", conn.getRemoteAddress(), " (", delta, "ms)");
@@ -171,8 +172,12 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 				logger.warn("Received OP_ACCEPT but no socket is available");
 				return;
 			}
+			socketChannel.configureBlocking(false);
 
-			InetConnection conn = this.handleConnection(socketChannel);
+			SelectionKey connkey = super.registerChannel(socketChannel, SelectionKey.OP_READ);
+			InetSocketConnection conn = this.handleConnection(connkey);
+			connkey.attach(conn);
+
 			conn.setOnLocalClose(super::onConnectionClosed);
 
 			conn.setOnConnect(() -> {
@@ -183,18 +188,19 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 			});
 
 			this.handleConnectionPost(conn);
-
-			super.registerChannel(socketChannel, SelectionKey.OP_READ, conn);
-		}else if(key.isReadable() && key.attachment() instanceof InetConnection){
-			InetConnection conn = (InetConnection) key.attachment();
+		}else if(key.isReadable()){
+			InetSocketConnection conn = (InetSocketConnection) key.attachment();
 			byte[] data = conn.read();
 			if(data != null){
 				this.worker.accept(() -> {
 					conn.handleData(data);
 				});
 			}
+		}else if(key.isWritable()){
+			InetSocketConnection conn = (InetSocketConnection) key.attachment();
+			conn.flushWriteBacklog();
 		}else
-			throw new RuntimeException("Invalid key state");
+			throw new RuntimeException("Invalid key state: " + key.readyOps());
 	}
 
 

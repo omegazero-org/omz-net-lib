@@ -12,7 +12,7 @@
 package org.omegazero.net.server;
 
 import java.io.IOException;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.SelectionKey;
 import java.util.Collection;
 import java.util.function.Consumer;
 
@@ -22,7 +22,7 @@ import javax.net.ssl.SSLHandshakeException;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
-import org.omegazero.net.socket.InetConnection;
+import org.omegazero.net.socket.InetSocketConnection;
 import org.omegazero.net.socket.impl.TLSConnection;
 
 /**
@@ -81,8 +81,8 @@ public class TLSServer extends TCPServer {
 
 
 	@Override
-	protected InetConnection handleConnection(SocketChannel socketChannel) throws IOException {
-		InetConnection conn = new TLSConnection(socketChannel, this.sslContext, false, this.supportedApplicationLayerProtocols);
+	protected InetSocketConnection handleConnection(SelectionKey selectionKey) throws IOException {
+		InetSocketConnection conn = new TLSConnection(selectionKey, this.sslContext, false, this.supportedApplicationLayerProtocols);
 
 		// see note in PlainTCPServer
 		conn.setOnError((e) -> {

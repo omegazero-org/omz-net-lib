@@ -50,7 +50,9 @@ public abstract class InetConnectionSelector extends SelectorHandler {
 	 * @param conn The connection that finished connecting
 	 */
 	protected void onConnectionClosed(InetConnection conn) {
-		this.closedConnections.add(conn);
+		synchronized(this.closedConnections){
+			this.closedConnections.add(conn);
+		}
 		super.selectorWakeup();
 	}
 
@@ -58,11 +60,13 @@ public abstract class InetConnectionSelector extends SelectorHandler {
 	@Override
 	protected void loopIteration() throws IOException {
 		if(this.closedConnections.size() > 0){
-			Iterator<InetConnection> closeIterator = this.closedConnections.iterator();
-			while(closeIterator.hasNext()){
-				logger.trace("Handling local close");
-				this.handleConnectionClosed(closeIterator.next());
-				closeIterator.remove();
+			synchronized(this.closedConnections){
+				Iterator<InetConnection> closeIterator = this.closedConnections.iterator();
+				while(closeIterator.hasNext()){
+					logger.trace("Handling local close");
+					this.handleConnectionClosed(closeIterator.next());
+					closeIterator.remove();
+				}
 			}
 		}
 	}

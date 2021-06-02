@@ -25,6 +25,7 @@ import org.omegazero.net.client.params.InetConnectionParameters;
 import org.omegazero.net.common.InetConnectionSelector;
 import org.omegazero.net.common.SyncWorker;
 import org.omegazero.net.socket.InetConnection;
+import org.omegazero.net.socket.InetSocketConnection;
 
 public abstract class TCPClientManager extends InetConnectionSelector implements InetClientManager {
 
@@ -49,19 +50,19 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 	}
 
 
-	protected abstract InetConnection createConnection(SocketChannel socketChannel, InetConnectionParameters params) throws IOException;
+	protected abstract InetSocketConnection createConnection(SelectionKey selectionKey, InetConnectionParameters params) throws IOException;
 
 	/**
 	 * Called when a connection was established.
 	 * 
-	 * @param conn The {@link InetConnection} object representing the connection that was established
+	 * @param conn The {@link InetSocketConnection} object representing the connection that was established
 	 */
-	protected abstract void handleConnect(InetConnection conn) throws IOException;
+	protected abstract void handleConnect(InetSocketConnection conn) throws IOException;
 
 
 	private void finishConnect(SelectionKey key) throws IOException {
 		key.interestOps(SelectionKey.OP_READ);
-		this.handleConnect((InetConnection) key.attachment());
+		this.handleConnect((InetSocketConnection) key.attachment());
 	}
 
 
@@ -76,11 +77,14 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 	}
 
 	@Override
-	public InetConnection connection(InetConnectionParameters params) throws IOException {
+	public synchronized InetConnection connection(InetConnectionParameters params) throws IOException {
 		SocketChannel socketChannel = SocketChannel.open();
 		socketChannel.configureBlocking(false);
 
-		InetConnection conn = this.createConnection(socketChannel, params);
+		SelectionKey key = super.registerChannel(socketChannel, 0); // the connection instance must set OP_CONNECT if necessary, otherwise, OP_READ will be set in finishConnect
+		InetSocketConnection conn = this.createConnection(key, params);
+		key.attach(conn);
+
 		conn.setOnLocalClose(super::onConnectionClosed);
 
 		conn.setOnError((e) -> {
@@ -90,9 +94,11 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 		if(params.getLocal() != null)
 			socketChannel.bind(params.getLocal());
 
-		SelectionKey key = super.registerChannel(socketChannel, SelectionKey.OP_CONNECT, conn);
 		conn.setOnLocalConnect((c) -> {
-			TCPClientManager.this.completedConnections.add(key);
+			synchronized(TCPClientManager.this.completedConnections){
+				TCPClientManager.this.completedConnections.add(key);
+			}
+			TCPClientManager.super.selectorWakeup();
 		});
 		return conn;
 	}
@@ -107,22 +113,24 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 	protected void loopIteration() throws IOException {
 		super.loopIteration();
 		if(this.completedConnections.size() > 0){
-			Iterator<SelectionKey> compIterator = this.completedConnections.iterator();
-			while(compIterator.hasNext()){
-				logger.trace("Handling local connect");
-				this.finishConnect(compIterator.next());
-				compIterator.remove();
+			synchronized(this.completedConnections){
+				Iterator<SelectionKey> compIterator = this.completedConnections.iterator();
+				while(compIterator.hasNext()){
+					logger.trace("Handling local connect");
+					this.finishConnect(compIterator.next());
+					compIterator.remove();
+				}
 			}
 		}
 	}
 
 	@Override
-	protected void handleSelectedKey(SelectionKey key) throws IOException {
+	protected synchronized void handleSelectedKey(SelectionKey key) throws IOException {
 		Objects.requireNonNull(key.attachment(), "SelectionKey attachment is null");
-		if(!(key.attachment() instanceof InetConnection))
+		if(!(key.attachment() instanceof InetSocketConnection))
 			throw new RuntimeException(
-					"SelectionKey attachment is of type " + key.attachment().getClass().getName() + ", but expected type " + InetConnection.class.getName());
-		InetConnection conn = (InetConnection) key.attachment();
+					"SelectionKey attachment is of type " + key.attachment().getClass().getName() + ", but expected type " + InetSocketConnection.class.getName());
+		InetSocketConnection conn = (InetSocketConnection) key.attachment();
 		if(key.isConnectable()){
 			SocketChannel channel = (SocketChannel) key.channel();
 			try{
@@ -140,6 +148,9 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 					conn.handleData(data);
 				});
 			}
-		}
+		}else if(key.isWritable()){
+			conn.flushWriteBacklog();
+		}else
+			throw new RuntimeException("Invalid key state: " + key.readyOps());
 	}
 }

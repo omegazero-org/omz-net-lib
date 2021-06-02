@@ -14,18 +14,18 @@ package org.omegazero.net.socket.impl;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.SelectionKey;
 
 import org.omegazero.net.socket.InetSocketConnection;
 
 public class PlainConnection extends InetSocketConnection {
 
-	public PlainConnection(SocketChannel socket) throws IOException {
-		this(socket, null);
+	public PlainConnection(SelectionKey selectionKey) throws IOException {
+		this(selectionKey, null);
 	}
 
-	public PlainConnection(SocketChannel socket, InetSocketAddress remote) throws IOException {
-		super(socket, remote);
+	public PlainConnection(SelectionKey selectionKey, InetSocketAddress remote) throws IOException {
+		super(selectionKey, remote);
 		this.createBuffers();
 	}
 
@@ -38,20 +38,22 @@ public class PlainConnection extends InetSocketConnection {
 
 
 	@Override
-	public synchronized byte[] read() {
+	public byte[] read() {
 		try{
 			if(!super.isConnected())
 				return null;
-			super.readBuf.clear();
-			if(super.readFromSocket() >= 0){
-				super.readBuf.flip();
-				if(super.readBuf.hasRemaining()){
-					byte[] a = new byte[super.readBuf.remaining()];
-					super.readBuf.get(a);
-					super.readBuf.compact();
-					return a;
-				}else
-					return null;
+			synchronized(super.readBuf){
+				super.readBuf.clear();
+				if(super.readFromSocket() >= 0){
+					super.readBuf.flip();
+					if(super.readBuf.hasRemaining()){
+						byte[] a = new byte[super.readBuf.remaining()];
+						super.readBuf.get(a);
+						super.readBuf.compact();
+						return a;
+					}else
+						return null;
+				}
 			}
 		}catch(Exception e){
 			super.handleError(e);
@@ -62,21 +64,23 @@ public class PlainConnection extends InetSocketConnection {
 	}
 
 	@Override
-	public synchronized void write(byte[] a) {
+	public void write(byte[] a) {
 		try{
-			if(!super.isConnected()){
+			if(!super.hasConnected()){
 				super.queueWrite(a);
 				return;
 			}
-			super.writeBuf.clear();
-			int written = 0;
-			while(written < a.length){
-				int wr = Math.min(super.writeBuf.remaining(), a.length - written);
-				super.writeBuf.put(a, written, wr);
-				super.writeBuf.flip();
-				super.writeToSocket();
-				super.writeBuf.compact();
-				written += wr;
+			synchronized(super.writeBuf){
+				super.writeBuf.clear();
+				int written = 0;
+				while(written < a.length){
+					int wr = Math.min(super.writeBuf.remaining(), a.length - written);
+					super.writeBuf.put(a, written, wr);
+					super.writeBuf.flip();
+					super.writeToSocket();
+					super.writeBuf.compact();
+					written += wr;
+				}
 			}
 		}catch(Throwable e){
 			super.handleError(e);

@@ -15,7 +15,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.SelectionKey;
 import java.util.Arrays;
 
 import javax.net.ssl.SNIHostName;
@@ -52,13 +52,13 @@ public class TLSConnection extends InetSocketConnection {
 
 	private String alpnProtocol = null;
 
-	public TLSConnection(SocketChannel socket, SSLContext sslContext, boolean client, String[] alpnNames) throws IOException {
-		this(socket, null, sslContext, client, alpnNames, null);
+	public TLSConnection(SelectionKey selectionKey, SSLContext sslContext, boolean client, String[] alpnNames) throws IOException {
+		this(selectionKey, null, sslContext, client, alpnNames, null);
 	}
 
-	public TLSConnection(SocketChannel socket, InetSocketAddress remote, SSLContext sslContext, boolean client, String[] alpnNames, String[] requestedServerNames)
+	public TLSConnection(SelectionKey selectionKey, InetSocketAddress remote, SSLContext sslContext, boolean client, String[] alpnNames, String[] requestedServerNames)
 			throws IOException {
-		super(socket, remote);
+		super(selectionKey, remote);
 		this.sslContext = sslContext;
 		this.alpnNames = alpnNames;
 
@@ -130,24 +130,26 @@ public class TLSConnection extends InetSocketConnection {
 
 
 	@Override
-	public synchronized byte[] read() {
+	public byte[] read() {
 		try{
 			if(!super.isConnected())
 				return null;
-			super.readBuf.clear();
-			if(this.handshakeComplete){
-				int read = super.readFromSocket();
-				if(read > 0){
+			synchronized(super.readBuf){
+				super.readBuf.clear();
+				if(this.handshakeComplete){
+					int read = super.readFromSocket();
+					if(read > 0){
+						super.readBuf.flip();
+						return this.readApplicationData();
+					}else if(read < 0){
+						this.close();
+					}
+				}else{
+					this.doTLSHandshake();
 					super.readBuf.flip();
-					return this.readApplicationData();
-				}else if(read < 0){
-					this.close();
-				}
-			}else{
-				this.doTLSHandshake();
-				super.readBuf.flip();
-				if(this.handshakeComplete && super.readBuf.hasRemaining()){
-					return this.readApplicationData();
+					if(this.handshakeComplete && super.readBuf.hasRemaining()){
+						return this.readApplicationData();
+					}
 				}
 			}
 		}catch(Exception e){
@@ -157,50 +159,54 @@ public class TLSConnection extends InetSocketConnection {
 	}
 
 	@Override
-	public synchronized void write(byte[] a) {
+	public void write(byte[] a) {
 		try{
 			if(!this.handshakeComplete){
 				super.queueWrite(a);
 				return;
 			}
-			this.writeBufUnwrapped.clear();
-			int written = 0;
-			while(written < a.length){
-				int wr = Math.min(this.writeBufUnwrapped.remaining(), a.length - written);
-				this.writeBufUnwrapped.put(a, written, wr);
-				this.writeBufUnwrapped.flip();
+			synchronized(super.writeBuf){
+				this.writeBufUnwrapped.clear();
+				int written = 0;
+				while(written < a.length){
+					int wr = Math.min(this.writeBufUnwrapped.remaining(), a.length - written);
+					this.writeBufUnwrapped.put(a, written, wr);
+					this.writeBufUnwrapped.flip();
 
-				while(this.writeBufUnwrapped.hasRemaining()){
-					super.writeBuf.clear();
-					SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
-					if(result.getStatus() == Status.OK){
-						super.writeBuf.flip();
-						super.writeToSocket();
-					}else
-						throw new SSLException("Write SSL wrap failed: " + result.getStatus());
+					while(this.writeBufUnwrapped.hasRemaining()){
+						super.writeBuf.clear();
+						SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
+						if(result.getStatus() == Status.OK){
+							super.writeBuf.flip();
+							super.writeToSocket();
+						}else
+							throw new SSLException("Write SSL wrap failed: " + result.getStatus());
+					}
+
+					this.writeBufUnwrapped.compact();
+					written += wr;
 				}
-
-				this.writeBufUnwrapped.compact();
-				written += wr;
 			}
-		}catch(Throwable e){
+		}catch(Exception e){
 			super.handleError(e);
 		}
 	}
 
 	@Override
-	public synchronized void close() {
+	public void close() {
 		this.sslEngine.closeOutbound();
 		this.sslEngine.getSession().invalidate();
 		if(super.isConnected()){
-			try{
-				super.writeBuf.clear();
-				SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
-				super.writeBuf.flip();
-				int written = super.writeToSocket();
-				logger.debug("Wrote SSL close message (", written, " bytes, status ", result.getStatus(), ")");
-			}catch(IOException e){
-				logger.debug("Error while writing SSL close message: ", e.toString());
+			synchronized(super.writeBuf){
+				try{
+					super.writeBuf.clear();
+					SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
+					super.writeBuf.flip();
+					int written = super.writeToSocket();
+					logger.debug("Wrote SSL close message (", written, " bytes, status ", result.getStatus(), ")");
+				}catch(IOException e){
+					logger.debug("Error while writing SSL close message: ", e.toString());
+				}
 			}
 		}
 		super.close();

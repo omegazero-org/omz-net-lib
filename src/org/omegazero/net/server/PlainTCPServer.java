@@ -12,13 +12,13 @@
 package org.omegazero.net.server;
 
 import java.io.IOException;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.SelectionKey;
 import java.util.Collection;
 import java.util.function.Consumer;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
-import org.omegazero.net.socket.InetConnection;
+import org.omegazero.net.socket.InetSocketConnection;
 import org.omegazero.net.socket.impl.PlainConnection;
 
 /**
@@ -46,8 +46,8 @@ public class PlainTCPServer extends TCPServer {
 
 
 	@Override
-	protected InetConnection handleConnection(SocketChannel socketChannel) throws IOException {
-		InetConnection conn = new PlainConnection(socketChannel, null);
+	protected InetSocketConnection handleConnection(SelectionKey selectionKey) throws IOException {
+		InetSocketConnection conn = new PlainConnection(selectionKey, null);
 
 		// this is to handle errors that happen before another error handler was set, for example because a TLS handshake error occurred
 		// and there was no way to set another error handler because the onConnect was not called yet
@@ -61,7 +61,7 @@ public class PlainTCPServer extends TCPServer {
 	}
 
 	@Override
-	protected void handleConnectionPost(InetConnection connection) {
+	protected void handleConnectionPost(InetSocketConnection connection) {
 		connection.handleConnect(); // plain connections have no additional handshake and are considered connected immediately
 	}
 }

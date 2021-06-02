@@ -12,7 +12,7 @@
 package org.omegazero.net.client;
 
 import java.io.IOException;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.SelectionKey;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
@@ -26,7 +26,7 @@ import javax.net.ssl.X509TrustManager;
 
 import org.omegazero.net.client.params.InetConnectionParameters;
 import org.omegazero.net.client.params.TLSConnectionParameters;
-import org.omegazero.net.socket.InetConnection;
+import org.omegazero.net.socket.InetSocketConnection;
 import org.omegazero.net.socket.impl.TLSConnection;
 import org.omegazero.net.util.SSLUtil;
 
@@ -64,7 +64,7 @@ public class TLSClientManager extends TCPClientManager {
 
 
 	@Override
-	protected InetConnection createConnection(SocketChannel socketChannel, InetConnectionParameters params) throws IOException {
+	protected InetSocketConnection createConnection(SelectionKey selectionKey, InetConnectionParameters params) throws IOException {
 		try{
 			if(!(params instanceof TLSConnectionParameters))
 				throw new IllegalArgumentException("params must be an instance of " + TLSConnectionParameters.class.getName());
@@ -72,14 +72,14 @@ public class TLSClientManager extends TCPClientManager {
 
 			SSLContext context = SSLContext.getInstance("TLS");
 			context.init(null, this.trustManagers, null);
-			return new TLSConnection(socketChannel, params.getRemote(), context, true, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
+			return new TLSConnection(selectionKey, params.getRemote(), context, true, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
 		}catch(GeneralSecurityException | IOException e){
 			throw new RuntimeException("Error while creating TLS client connection", e);
 		}
 	}
 
 	@Override
-	protected void handleConnect(InetConnection conn) throws IOException {
+	protected void handleConnect(InetSocketConnection conn) throws IOException {
 		((TLSConnection) conn).doTLSHandshake();
 	}
 

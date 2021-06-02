@@ -12,11 +12,11 @@
 package org.omegazero.net.client;
 
 import java.io.IOException;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.SelectionKey;
 import java.util.function.Consumer;
 
 import org.omegazero.net.client.params.InetConnectionParameters;
-import org.omegazero.net.socket.InetConnection;
+import org.omegazero.net.socket.InetSocketConnection;
 import org.omegazero.net.socket.impl.PlainConnection;
 
 public class PlainTCPClientManager extends TCPClientManager {
@@ -31,12 +31,12 @@ public class PlainTCPClientManager extends TCPClientManager {
 
 
 	@Override
-	protected InetConnection createConnection(SocketChannel socketChannel, InetConnectionParameters params) throws IOException {
-		return new PlainConnection(socketChannel, params.getRemote());
+	protected InetSocketConnection createConnection(SelectionKey selectionKey, InetConnectionParameters params) throws IOException {
+		return new PlainConnection(selectionKey, params.getRemote());
 	}
 
 	@Override
-	protected void handleConnect(InetConnection conn) throws IOException {
+	protected void handleConnect(InetSocketConnection conn) throws IOException {
 		conn.handleConnect();
 	}
 }
