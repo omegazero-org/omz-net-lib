@@ -59,7 +59,7 @@ public abstract class SelectorHandler {
 	}
 
 	/**
-	 * Stops this instance and closes the {@link Selector} instance.
+	 * Stops the selector loop, closes all channels registered with this selector and closes the {@link Selector} instance.
 	 * 
 	 * @throws IOException
 	 */
@@ -67,6 +67,8 @@ public abstract class SelectorHandler {
 		if(!this.running)
 			return;
 		this.running = false;
+		for(SelectionKey key : this.selector.keys())
+			key.channel().close();
 		this.selector.close();
 	}
 
