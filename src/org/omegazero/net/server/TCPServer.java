@@ -167,6 +167,10 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 		if(key.isAcceptable()){
 			ServerSocketChannel serverChannel = (ServerSocketChannel) key.channel();
 			SocketChannel socketChannel = serverChannel.accept();
+			if(socketChannel == null){
+				logger.warn("Received OP_ACCEPT but no socket is available");
+				return;
+			}
 
 			InetConnection conn = this.handleConnection(socketChannel);
 			conn.setOnLocalClose(super::onConnectionClosed);
@@ -189,7 +193,8 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 					conn.handleData(data);
 				});
 			}
-		}
+		}else
+			throw new RuntimeException("Invalid key state");
 	}
 
 
