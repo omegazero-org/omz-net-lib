@@ -26,20 +26,20 @@ import java.util.function.Consumer;
 import org.omegazero.common.event.Tasks;
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
-import org.omegazero.net.common.InetConnectionSelector;
+import org.omegazero.net.common.ConnectionSelectorHandler;
 import org.omegazero.net.common.SyncWorker;
-import org.omegazero.net.socket.InetConnection;
-import org.omegazero.net.socket.InetSocketConnection;
+import org.omegazero.net.socket.ChannelConnection;
+import org.omegazero.net.socket.SocketConnection;
 
 /**
- * TCP server implementation of an {@link InetServer} based on java.nio channels.
+ * TCP/IP server implementation of a {@link NetServer} based on java.nio channels.
  */
-public abstract class TCPServer extends InetConnectionSelector implements InetServer {
+public abstract class TCPServer extends ConnectionSelectorHandler implements NetServer {
 
 	private static final Logger logger = LoggerUtil.createLogger();
 
 
-	private Consumer<InetConnection> onNewConnection;
+	private Consumer<SocketConnection> onNewConnection;
 
 	private List<ServerSocketChannel> serverSockets = new ArrayList<>();
 
@@ -64,10 +64,11 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 	/**
 	 * Constructs a new <code>TCPServer</code> instance.<br>
 	 * <br>
-	 * To initialize the server, {@link InetServer#init()} of this object must be called. After the call succeeded, the server will listen on the specified local address
-	 * (<b>bindAddress</b>) on the given <b>ports</b> and {@link InetServer#serverLoop()} must be called to start processing incoming connection requests and data.
+	 * To initialize the server, {@link NetServer#init()} of this object must be called. After the call succeeded, the server will listen on the specified local address
+	 * (<b>bindAddress</b>) on the given <b>ports</b> and {@link NetServer#start()} must be called to start processing incoming connection requests and data.
 	 * 
-	 * @param bindAddress The local address to bind to (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)})
+	 * @param bindAddress The local address to bind to (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)}). May be <code>null</code> to use an automatically
+	 *                    assigned address
 	 * @param ports       The list of ports to listen on
 	 * @param backlog     The maximum number of pending connections (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)}). May be 0 to use a default value
 	 * @param worker      A callback accepting tasks to run that may require increased processing time. May be <code>null</code> to run everything using a single thread
@@ -97,7 +98,7 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 		super.initSelector();
 		for(int p : this.ports){
 			this.listenOnPort(p);
-			logger.info("Listening plain on port " + p);
+			logger.info("Listening on port " + p);
 		}
 	}
 
@@ -110,9 +111,9 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 	}
 
 
-	protected abstract InetSocketConnection handleConnection(SelectionKey selectionKey) throws IOException;
+	protected abstract ChannelConnection handleConnection(SelectionKey selectionKey) throws IOException;
 
-	protected void handleConnectionPost(InetSocketConnection connection) {
+	protected void handleConnectionPost(ChannelConnection connection) {
 	}
 
 
@@ -128,8 +129,8 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 			long currentTime = System.currentTimeMillis();
 			try{
 				for(SelectionKey k : super.selectorKeys()){
-					if(k.attachment() instanceof InetSocketConnection){
-						InetSocketConnection conn = (InetSocketConnection) k.attachment();
+					if(k.attachment() instanceof ChannelConnection){
+						ChannelConnection conn = (ChannelConnection) k.attachment();
 						long delta = currentTime - conn.getLastIOTime();
 						if(delta < 0 || delta > timeout){
 							logger.debug("Idle Timeout: ", conn.getRemoteAddress(), " (", delta, "ms)");
@@ -153,13 +154,13 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 	}
 
 	@Override
-	public void setConnectionCallback(Consumer<InetConnection> handler) {
-		this.onNewConnection = handler;
+	public void start() throws IOException {
+		super.runSelectorLoop();
 	}
 
 	@Override
-	public void run() throws IOException {
-		super.runSelectorLoop();
+	public void setConnectionCallback(Consumer<SocketConnection> handler) {
+		this.onNewConnection = handler;
 	}
 
 
@@ -175,7 +176,7 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 			socketChannel.configureBlocking(false);
 
 			SelectionKey connkey = super.registerChannel(socketChannel, SelectionKey.OP_READ);
-			InetSocketConnection conn = this.handleConnection(connkey);
+			ChannelConnection conn = this.handleConnection(connkey);
 			connkey.attach(conn);
 
 			conn.setOnLocalClose(super::onConnectionClosed);
@@ -189,7 +190,7 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 
 			this.handleConnectionPost(conn);
 		}else if(key.isReadable()){
-			InetSocketConnection conn = (InetSocketConnection) key.attachment();
+			ChannelConnection conn = (ChannelConnection) key.attachment();
 			byte[] data = conn.read();
 			if(data != null){
 				this.worker.accept(() -> {
@@ -197,7 +198,7 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 				});
 			}
 		}else if(key.isWritable()){
-			InetSocketConnection conn = (InetSocketConnection) key.attachment();
+			ChannelConnection conn = (ChannelConnection) key.attachment();
 			conn.flushWriteBacklog();
 		}else
 			throw new RuntimeException("Invalid key state: " + key.readyOps());
@@ -205,7 +206,7 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 
 
 	public long getIdleTimeout() {
-		return idleTimeout;
+		return this.idleTimeout;
 	}
 
 	public void setIdleTimeout(long idleTimeout) {
@@ -213,10 +214,10 @@ public abstract class TCPServer extends InetConnectionSelector implements InetSe
 	}
 
 	public InetAddress getBindAddress() {
-		return bindAddress;
+		return this.bindAddress;
 	}
 
 	public int getBacklog() {
-		return backlog;
+		return this.backlog;
 	}
 }

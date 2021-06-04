@@ -13,7 +13,7 @@ package org.omegazero.net.common;
 
 import java.io.IOException;
 
-public interface NetworkApplication {
+public interface NetworkApplication extends Runnable {
 
 	/**
 	 * Initializes this application.
@@ -23,7 +23,7 @@ public interface NetworkApplication {
 	public void init() throws IOException;
 
 	/**
-	 * Closes this application, closing all bound and connected sockets and stopping the {@link NetworkApplication#loop}.
+	 * Closes this application, closing all bound and connected sockets and stopping the main loop, causing a call to {@link #start} to return.
 	 * 
 	 * @throws IOException If an IO error occurs
 	 */
@@ -32,9 +32,27 @@ public interface NetworkApplication {
 	/**
 	 * Runs the main loop of this instance. This loop processes incoming or outgoing connection requests and network traffic.<br>
 	 * <br>
-	 * Under normal circumstances, should never return before {@link NetworkApplication#close()} is called, otherwise, the function should return as soon as possible.
+	 * Under normal circumstances, should never return before {@link #close()} is called. After <code>close()</code> is called, this function should return as soon as
+	 * possible.<br>
+	 * <br>
+	 * If this method is called before {@link #init()}, the behavior is undefined.
 	 * 
 	 * @throws IOException If an IO error occurs during any networking operation
 	 */
-	public void run() throws IOException;
+	public void start() throws IOException;
+
+
+	/**
+	 * Method which implements the {@link Runnable#run()} function.<br>
+	 * <br>
+	 * This method is equivalent to {@link #start()}, except that any <code>IOException</code>s thrown are wrapped into a <code>RuntimeException</code>. An application using
+	 * this instance may want to use {@link #start()} instead, to properly handle errors.
+	 */
+	default void run() {
+		try{
+			this.start();
+		}catch(IOException e){
+			throw new RuntimeException("Error in " + this.getClass().getName() + " main loop", e);
+		}
+	}
 }

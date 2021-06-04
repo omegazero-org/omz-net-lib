@@ -46,6 +46,10 @@ public final class SSLUtil {
 	}
 
 	public static SSLContext getSSLContextFromKeyStore(String filename, String password, String keypassword) throws GeneralSecurityException, IOException {
+		return SSLUtil.getSSLContextFromKeyStore("TLS", filename, password, keypassword);
+	}
+
+	public static SSLContext getSSLContextFromKeyStore(String protocol, String filename, String password, String keypassword) throws GeneralSecurityException, IOException {
 		if(filename == null)
 			throw new IllegalArgumentException("Tried to create a SSLContext but filename is null");
 		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
@@ -54,13 +58,17 @@ public final class SSLUtil {
 		KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
 		keyManagerFactory.init(keyStore, keypassword.toCharArray());
 
-		SSLContext sslContext = SSLContext.getInstance("TLS");
+		SSLContext sslContext = SSLContext.getInstance(protocol);
 		sslContext.init(keyManagerFactory.getKeyManagers(), null, new SecureRandom());
 		return sslContext;
 	}
 
 
 	public static SSLContext getSSLContextFromPEM(String keyFile, String certFile) throws GeneralSecurityException, IOException {
+		return SSLUtil.getSSLContextFromPEM("TLS", keyFile, certFile);
+	}
+
+	public static SSLContext getSSLContextFromPEM(String protocol, String keyFile, String certFile) throws GeneralSecurityException, IOException {
 		if(keyFile == null || certFile == null)
 			throw new IllegalArgumentException("Tried to create a SSLContext but a filename is null");
 
@@ -74,7 +82,7 @@ public final class SSLUtil {
 		KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
 		keyManagerFactory.init(keyStore, "password".toCharArray());
 
-		SSLContext sslContext = SSLContext.getInstance("TLS");
+		SSLContext sslContext = SSLContext.getInstance(protocol);
 		sslContext.init(keyManagerFactory.getKeyManagers(), null, new SecureRandom());
 		return sslContext;
 	}

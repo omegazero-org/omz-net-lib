@@ -14,19 +14,16 @@ package org.omegazero.net.server;
 import java.util.function.Consumer;
 
 import org.omegazero.net.common.NetworkApplication;
-import org.omegazero.net.socket.InetConnection;
+import org.omegazero.net.socket.SocketConnection;
 
-/**
- * A server accepting stateful connection requests based on the Internet Protocol.
- */
-public interface InetServer extends NetworkApplication {
+public interface NetServer extends NetworkApplication {
 
 	/**
 	 * Sets the callback for a new incoming request.<br>
 	 * <br>
-	 * The first parameter of this callback is an {@link InetConnection} instance representing the new connection from the client.
+	 * The first parameter of this callback is an {@link SocketConnection} instance representing the new connection from the client.
 	 * 
 	 * @param handler The connection callback
 	 */
-	public void setConnectionCallback(Consumer<InetConnection> handler);
+	public void setConnectionCallback(Consumer<SocketConnection> handler);
 }

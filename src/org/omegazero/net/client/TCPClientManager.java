@@ -21,19 +21,20 @@ import java.util.function.Consumer;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
-import org.omegazero.net.client.params.InetConnectionParameters;
-import org.omegazero.net.common.InetConnectionSelector;
+import org.omegazero.net.client.params.ConnectionParameters;
+import org.omegazero.net.common.ConnectionSelectorHandler;
+import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.common.SyncWorker;
-import org.omegazero.net.socket.InetConnection;
-import org.omegazero.net.socket.InetSocketConnection;
+import org.omegazero.net.socket.ChannelConnection;
+import org.omegazero.net.socket.SocketConnection;
 
-public abstract class TCPClientManager extends InetConnectionSelector implements InetClientManager {
+public abstract class TCPClientManager extends ConnectionSelectorHandler implements NetClientManager {
 
 	private static final Logger logger = LoggerUtil.createLogger();
 
 
 	// the connect() method returns true if the connection is established immediately, *instead* of firing OP_CONNECT. To have both cases look somewhat similar
-	// (ie called by the selectorLoop() thread, asynchronously), this exists for similar reasons why closedConnections in InetConnectionSelector exists. This is a mess, i know.
+	// (ie called by the selectorLoop() thread, asynchronously), this exists for similar reasons why closedConnections in ConnectionSelectorHandler exists. This is a mess, i know.
 	private HashSet<SelectionKey> completedConnections = new HashSet<>();
 
 	protected final Consumer<Runnable> worker;
@@ -50,19 +51,19 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 	}
 
 
-	protected abstract InetSocketConnection createConnection(SelectionKey selectionKey, InetConnectionParameters params) throws IOException;
+	protected abstract ChannelConnection createConnection(SelectionKey selectionKey, ConnectionParameters params) throws IOException;
 
 	/**
 	 * Called when a connection was established.
 	 * 
-	 * @param conn The {@link InetSocketConnection} object representing the connection that was established
+	 * @param conn The {@link ChannelConnection} object representing the connection that was established
 	 */
-	protected abstract void handleConnect(InetSocketConnection conn) throws IOException;
+	protected abstract void handleConnect(ChannelConnection conn);
 
 
 	private void finishConnect(SelectionKey key) throws IOException {
 		key.interestOps(SelectionKey.OP_READ);
-		this.handleConnect((InetSocketConnection) key.attachment());
+		this.handleConnect((ChannelConnection) key.attachment());
 	}
 
 
@@ -77,18 +78,23 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 	}
 
 	@Override
-	public synchronized InetConnection connection(InetConnectionParameters params) throws IOException {
+	public void start() throws IOException {
+		super.runSelectorLoop();
+	}
+
+	@Override
+	public synchronized SocketConnection connection(ConnectionParameters params) throws IOException {
 		SocketChannel socketChannel = SocketChannel.open();
 		socketChannel.configureBlocking(false);
 
 		SelectionKey key = super.registerChannel(socketChannel, 0); // the connection instance must set OP_CONNECT if necessary, otherwise, OP_READ will be set in finishConnect
-		InetSocketConnection conn = this.createConnection(key, params);
+		ChannelConnection conn = this.createConnection(key, params);
 		key.attach(conn);
 
 		conn.setOnLocalClose(super::onConnectionClosed);
 
 		conn.setOnError((e) -> {
-			logger.warn("Socket Error (remote address=", conn.getRemoteAddress(), "): ", e.toString());
+			logger.warn("Socket Error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
 		});
 
 		if(params.getLocal() != null)
@@ -101,11 +107,6 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 			TCPClientManager.super.selectorWakeup();
 		});
 		return conn;
-	}
-
-	@Override
-	public void run() throws IOException {
-		super.runSelectorLoop();
 	}
 
 
@@ -127,10 +128,7 @@ public abstract class TCPClientManager extends InetConnectionSelector implements
 	@Override
 	protected synchronized void handleSelectedKey(SelectionKey key) throws IOException {
 		Objects.requireNonNull(key.attachment(), "SelectionKey attachment is null");
-		if(!(key.attachment() instanceof InetSocketConnection))
-			throw new RuntimeException(
-					"SelectionKey attachment is of type " + key.attachment().getClass().getName() + ", but expected type " + InetSocketConnection.class.getName());
-		InetSocketConnection conn = (InetSocketConnection) key.attachment();
+		ChannelConnection conn = (ChannelConnection) key.attachment();
 		if(key.isConnectable()){
 			SocketChannel channel = (SocketChannel) key.channel();
 			try{

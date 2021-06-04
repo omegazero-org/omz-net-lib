@@ -11,25 +11,25 @@
  */
 package org.omegazero.net.socket;
 
-import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Represents any type of stateful connection based on the Internet Protocol.
+ * Represents any type of connection between the local and a remote host.
  */
-public abstract class InetConnection {
+public abstract class SocketConnection {
 
 	private Runnable onConnect;
 	private Runnable onTimeout;
 	private Consumer<byte[]> onData;
 	private Runnable onClose;
 	private Consumer<Throwable> onError;
-	private Consumer<InetConnection> onLocalConnect;
-	private Consumer<InetConnection> onLocalClose;
+	private Consumer<SocketConnection> onLocalConnect;
+	private Consumer<SocketConnection> onLocalClose;
 
-	private InetSocketAddress apparentRemoteAddress;
+	private SocketAddress apparentRemoteAddress;
 
 	private Object attachment;
 
@@ -39,14 +39,14 @@ public abstract class InetConnection {
 
 
 	/**
-	 * Connects this <code>InetConnection</code> to the previously specified remote address in the constructor. If no address was specified, this method will throw an
+	 * Connects this <code>SocketConnection</code> to the previously specified remote address in the constructor. If no address was specified, this method will throw an
 	 * <code>UnsupportedOperationException</code><br>
 	 * <br>
 	 * This function is non-blocking.<br>
 	 * <br>
 	 * A connection timeout in milliseconds may be specified in the <b>timeout</b> parameter. If the connection has not been established within this timeout, the handler set
-	 * using {@link #setOnTimeout(Runnable)} is called and the connection is closed. Depending on the implementation, a timeout may occur earlier and may instead cause the
-	 * <code>onError</code> callback to be called.
+	 * using {@link #setOnTimeout(Runnable)} is called and the connection is closed. Depending on the implementation and underlying protocol, a timeout may occur earlier or
+	 * never and may instead cause the <code>onError</code> callback to be called.
 	 * 
 	 * @param timeout The connection timeout in milliseconds. Disabled if 0
 	 */
@@ -64,11 +64,13 @@ public abstract class InetConnection {
 	/**
 	 * Writes data to this connection for delivery to the peer host. <br>
 	 * <br>
-	 * This function returns after all data has been written to the write buffer.
+	 * This function is non-blocking.<br>
+	 * <br>
+	 * If this method is called before the <code>onConnect</code> event, the data is queued in a temporary buffer and written out when the socket connects.
 	 * 
-	 * @param a The data to be written to this connection
+	 * @param data The data to be written to this connection
 	 */
-	public abstract void write(byte[] a);
+	public abstract void write(byte[] data);
 
 	/**
 	 * Closes this connection.
@@ -85,13 +87,13 @@ public abstract class InetConnection {
 	 * 
 	 * @return The address of the peer host
 	 */
-	public abstract InetSocketAddress getRemoteAddress();
+	public abstract SocketAddress getRemoteAddress();
 
 	/**
 	 * 
 	 * @return The local address of this connection
 	 */
-	public abstract InetSocketAddress getLocalAddress();
+	public abstract SocketAddress getLocalAddress();
 
 	/**
 	 * 
@@ -107,16 +109,16 @@ public abstract class InetConnection {
 	 * 
 	 * @param apparentRemoteAddress The apparent address of the peer
 	 */
-	public final void setApparentRemoteAddress(InetSocketAddress apparentRemoteAddress) {
+	public final void setApparentRemoteAddress(SocketAddress apparentRemoteAddress) {
 		this.apparentRemoteAddress = apparentRemoteAddress;
 	}
 
 	/**
 	 * 
-	 * @return The apparent remote address previously set by {@link InetConnection#setApparentRemoteAddress(InetSocketAddress)}, or the address returned by
-	 *         {@link InetConnection#getRemoteAddress()} if none was set
+	 * @return The apparent remote address previously set by {@link SocketConnection#setApparentRemoteAddress(SocketAddress)}, or the address returned by
+	 *         {@link SocketConnection#getRemoteAddress()} if none was set
 	 */
-	public final InetSocketAddress getApparentRemoteAddress() {
+	public final SocketAddress getApparentRemoteAddress() {
 		if(this.apparentRemoteAddress != null)
 			return this.apparentRemoteAddress;
 		else
@@ -219,7 +221,7 @@ public abstract class InetConnection {
 	/**
 	 * Sets a callback that is called when an error occurs on this connection.<br>
 	 * <br>
-	 * This callback is usually followed by a <code>onClose</code> (set using {@link InetConnection#setOnClose(Runnable)}) callback.
+	 * This callback is usually followed by a <code>onClose</code> (set using {@link SocketConnection#setOnClose(Runnable)}) callback.
 	 * 
 	 * @param onError The callback
 	 */
@@ -227,13 +229,13 @@ public abstract class InetConnection {
 		this.onError = onError;
 	}
 
-	public final void setOnLocalClose(Consumer<InetConnection> onLocalClose) {
+	public final void setOnLocalClose(Consumer<SocketConnection> onLocalClose) {
 		if(this.onLocalClose != null)
 			throw new IllegalStateException("onLocalClose is already set");
 		this.onLocalClose = onLocalClose;
 	}
 
-	public final void setOnLocalConnect(Consumer<InetConnection> onLocalConnect) {
+	public final void setOnLocalConnect(Consumer<SocketConnection> onLocalConnect) {
 		if(this.onLocalConnect != null)
 			throw new IllegalStateException("onLocalConnect is already set");
 		this.onLocalConnect = onLocalConnect;

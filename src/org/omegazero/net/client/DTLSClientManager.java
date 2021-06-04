@@ -25,22 +25,22 @@ import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.client.params.TLSConnectionParameters;
 import org.omegazero.net.socket.ChannelConnection;
 import org.omegazero.net.socket.impl.TLSConnection;
-import org.omegazero.net.socket.provider.SocketChannelProvider;
+import org.omegazero.net.socket.provider.DatagramChannelProvider;
 import org.omegazero.net.util.TrustManagerUtil;
 
-public class TLSClientManager extends TCPClientManager {
+public class DTLSClientManager extends UDPClientManager {
 
 	private TrustManager[] trustManagers;
 
-	public TLSClientManager() {
+	public DTLSClientManager() {
 		this(null, (Collection<X509Certificate>) null);
 	}
 
-	public TLSClientManager(Consumer<Runnable> worker) {
+	public DTLSClientManager(Consumer<Runnable> worker) {
 		this(worker, (Collection<X509Certificate>) null);
 	}
 
-	public TLSClientManager(Consumer<Runnable> worker, Collection<X509Certificate> additionalTrustCertificates) {
+	public DTLSClientManager(Consumer<Runnable> worker, Collection<X509Certificate> additionalTrustCertificates) {
 		super(worker);
 		try{
 			this.trustManagers = TrustManagerUtil.getTrustManagersWithAdditionalCertificates(additionalTrustCertificates);
@@ -49,7 +49,7 @@ public class TLSClientManager extends TCPClientManager {
 		}
 	}
 
-	public TLSClientManager(Consumer<Runnable> worker, TrustManager[] trustManagers) {
+	public DTLSClientManager(Consumer<Runnable> worker, TrustManager[] trustManagers) {
 		super(worker);
 		this.trustManagers = trustManagers;
 	}
@@ -62,9 +62,9 @@ public class TLSClientManager extends TCPClientManager {
 				throw new IllegalArgumentException("params must be an instance of " + TLSConnectionParameters.class.getName());
 			TLSConnectionParameters tlsParams = (TLSConnectionParameters) params;
 
-			SSLContext context = SSLContext.getInstance("TLS");
+			SSLContext context = SSLContext.getInstance("DTLS");
 			context.init(null, this.trustManagers, null);
-			return new TLSConnection(selectionKey, new SocketChannelProvider(), params.getRemote(), context, true, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
+			return new TLSConnection(selectionKey, new DatagramChannelProvider(), params.getRemote(), context, true, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
 		}catch(GeneralSecurityException | IOException e){
 			throw new RuntimeException("Error while creating TLS client connection", e);
 		}

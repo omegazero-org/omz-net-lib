@@ -12,6 +12,7 @@
 package org.omegazero.net.server;
 
 import java.io.IOException;
+import java.net.SocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Collection;
 import java.util.function.Consumer;
@@ -21,50 +22,48 @@ import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.socket.ChannelConnection;
 import org.omegazero.net.socket.impl.PlainConnection;
-import org.omegazero.net.socket.provider.SocketChannelProvider;
+import org.omegazero.net.socket.provider.DatagramChannelProvider;
 
 /**
- * {@link TCPServer} implementation for plaintext TCP sockets.
+ * {@link UDPServer} implementation for plaintext UDP sockets.
  */
-public class PlainTCPServer extends TCPServer {
+public class PlainUDPServer extends UDPServer {
 
 	private static final Logger logger = LoggerUtil.createLogger();
 
 
 	/**
 	 * 
-	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
+	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
 	 */
-	public PlainTCPServer(Collection<Integer> ports) {
+	public PlainUDPServer(Collection<Integer> ports) {
 		super(ports);
 	}
 
 	/**
 	 * 
-	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
+	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
 	 */
-	public PlainTCPServer(String bindAddress, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout) {
-		super(bindAddress, ports, backlog, worker, idleTimeout);
+	public PlainUDPServer(String bindAddress, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize) {
+		super(bindAddress, ports, worker, idleTimeout, receiveBufferSize);
 	}
 
 
 	@Override
-	protected ChannelConnection handleConnection(SelectionKey selectionKey) throws IOException {
-		ChannelConnection conn = new PlainConnection(selectionKey, new SocketChannelProvider());
+	protected ChannelConnection handleConnection(SelectionKey serverKey, SocketAddress remote) throws IOException {
+		ChannelConnection conn = new PlainConnection(serverKey, new DatagramChannelProvider(remote, super::writeBacklogStarted), remote);
 
-		// this is to handle errors that happen before another error handler was set, for example because a TLS handshake error occurred
-		// and there was no way to set another error handler because the onConnect was not called yet
 		conn.setOnError((e) -> {
 			if(e instanceof IOException)
-				logger.warn("Socket Error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
+				logger.warn("UDP Socket Error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
 			else
-				logger.error("Error in connection (remote address=", conn.getRemoteAddress(), "): ", e);
+				logger.error("Error in UDP connection (remote address=", conn.getRemoteAddress(), "): ", e);
 		});
 		return conn;
 	}
 
 	@Override
 	protected void handleConnectionPost(ChannelConnection connection) {
-		connection.handleConnect(); // plain connections have no additional handshake and are considered connected immediately
+		connection.handleConnect();
 	}
 }

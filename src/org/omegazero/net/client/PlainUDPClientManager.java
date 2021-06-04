@@ -18,22 +18,22 @@ import java.util.function.Consumer;
 import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.socket.ChannelConnection;
 import org.omegazero.net.socket.impl.PlainConnection;
-import org.omegazero.net.socket.provider.SocketChannelProvider;
+import org.omegazero.net.socket.provider.DatagramChannelProvider;
 
-public class PlainTCPClientManager extends TCPClientManager {
+public class PlainUDPClientManager extends UDPClientManager {
 
-	public PlainTCPClientManager() {
+	public PlainUDPClientManager() {
 		super();
 	}
 
-	public PlainTCPClientManager(Consumer<Runnable> worker) {
+	public PlainUDPClientManager(Consumer<Runnable> worker) {
 		super(worker);
 	}
 
 
 	@Override
 	protected ChannelConnection createConnection(SelectionKey selectionKey, ConnectionParameters params) throws IOException {
-		return new PlainConnection(selectionKey, new SocketChannelProvider(), params.getRemote());
+		return new PlainConnection(selectionKey, new DatagramChannelProvider(), params.getRemote());
 	}
 
 	@Override

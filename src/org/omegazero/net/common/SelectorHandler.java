@@ -38,7 +38,7 @@ public abstract class SelectorHandler {
 
 
 	/**
-	 * Called when a key was selected in a select call in the {@link InetConnectionSelector#selectorLoop()} method.
+	 * Called when a key was selected in a select call in the {@link SelectorHandler#selectorLoop()} method.
 	 * 
 	 * @param key The selected key
 	 * @throws IOException
@@ -49,7 +49,7 @@ public abstract class SelectorHandler {
 	/**
 	 * Initializes the {@link Selector} and sets this instance as running.<br>
 	 * <br>
-	 * After this method has been called successfully, {@link InetConnectionSelector#selectorLoop()} should be called to start performing IO operations.
+	 * After this method has been called successfully, {@link SelectorHandler#selectorLoop()} should be called to start performing IO operations.
 	 * 
 	 * @throws IOException
 	 */
@@ -152,8 +152,7 @@ public abstract class SelectorHandler {
 	/**
 	 * Runs the loop that continuously selects channels using the {@link Selector}.<br>
 	 * <br>
-	 * Will not return until {@link InetConnectionSelector#closeSelector()} is called. If {@link InetConnectionSelector#initSelector()} was never called, this method returns
-	 * immediately.
+	 * Will not return until {@link SelectorHandler#closeSelector()} is called. If {@link SelectorHandler#initSelector()} was never called, this method returns immediately.
 	 * 
 	 * @throws IOException
 	 */

@@ -14,6 +14,7 @@ package org.omegazero.net.socket.impl;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.util.Arrays;
@@ -31,9 +32,10 @@ import javax.net.ssl.SSLHandshakeException;
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.common.util.PropertyUtil;
-import org.omegazero.net.socket.InetSocketConnection;
+import org.omegazero.net.socket.ChannelConnection;
+import org.omegazero.net.socket.provider.ChannelProvider;
 
-public class TLSConnection extends InetSocketConnection {
+public class TLSConnection extends ChannelConnection {
 
 	private static final Logger logger = LoggerUtil.createLogger();
 
@@ -52,19 +54,20 @@ public class TLSConnection extends InetSocketConnection {
 
 	private String alpnProtocol = null;
 
-	public TLSConnection(SelectionKey selectionKey, SSLContext sslContext, boolean client, String[] alpnNames) throws IOException {
-		this(selectionKey, null, sslContext, client, alpnNames, null);
+	public TLSConnection(SelectionKey selectionKey, ChannelProvider provider, SSLContext sslContext, boolean client, String[] alpnNames) throws IOException {
+		this(selectionKey, provider, null, sslContext, client, alpnNames, null);
 	}
 
-	public TLSConnection(SelectionKey selectionKey, InetSocketAddress remote, SSLContext sslContext, boolean client, String[] alpnNames, String[] requestedServerNames)
-			throws IOException {
-		super(selectionKey, remote);
+	public TLSConnection(SelectionKey selectionKey, ChannelProvider provider, SocketAddress remote, SSLContext sslContext, boolean client, String[] alpnNames,
+			String[] requestedServerNames) throws IOException {
+		super(selectionKey, provider, remote);
 		this.sslContext = sslContext;
 		this.alpnNames = alpnNames;
 
-		if(super.getRemoteAddress() != null)
-			this.sslEngine = this.sslContext.createSSLEngine(super.getRemoteAddress().getAddress().getHostAddress(), super.getRemoteAddress().getPort());
-		else
+		if(super.getRemoteAddress() != null && super.getRemoteAddress() instanceof InetSocketAddress){
+			InetSocketAddress inaddr = (InetSocketAddress) super.getRemoteAddress();
+			this.sslEngine = this.sslContext.createSSLEngine(inaddr.getAddress().getHostAddress(), inaddr.getPort());
+		}else
 			this.sslEngine = this.sslContext.createSSLEngine();
 		this.sslEngine.setUseClientMode(client);
 		this.sslEngine.setHandshakeApplicationProtocolSelector((sslEngine, list) -> {
@@ -123,7 +126,8 @@ public class TLSConnection extends InetSocketConnection {
 	@Override
 	protected void createBuffers() {
 		super.readBuf = ByteBuffer.allocate(this.sslEngine.getSession().getPacketBufferSize());
-		super.writeBuf = ByteBuffer.allocate(this.sslEngine.getSession().getPacketBufferSize());
+		// no idea why but apparently SSLEngine requires a massive buffer for DTLS even though it only writes less than 100 bytes, otherwise BUFFER_OVERFLOW
+		super.writeBuf = ByteBuffer.allocate(this.sslEngine.getSession().getPacketBufferSize() * 2);
 		this.readBufUnwrapped = ByteBuffer.allocate(this.sslEngine.getSession().getApplicationBufferSize());
 		this.writeBufUnwrapped = ByteBuffer.allocate(this.sslEngine.getSession().getApplicationBufferSize());
 	}
@@ -159,18 +163,20 @@ public class TLSConnection extends InetSocketConnection {
 	}
 
 	@Override
-	public void write(byte[] a) {
+	public void write(byte[] data) {
 		try{
-			if(!this.handshakeComplete){
-				super.queueWrite(a);
-				return;
+			synchronized(this){
+				if(!super.hasConnected()){
+					super.queueWrite(data);
+					return;
+				}
 			}
 			synchronized(super.writeBuf){
 				this.writeBufUnwrapped.clear();
 				int written = 0;
-				while(written < a.length){
-					int wr = Math.min(this.writeBufUnwrapped.remaining(), a.length - written);
-					this.writeBufUnwrapped.put(a, written, wr);
+				while(written < data.length){
+					int wr = Math.min(this.writeBufUnwrapped.remaining(), data.length - written);
+					this.writeBufUnwrapped.put(data, written, wr);
 					this.writeBufUnwrapped.flip();
 
 					while(this.writeBufUnwrapped.hasRemaining()){
@@ -214,7 +220,7 @@ public class TLSConnection extends InetSocketConnection {
 
 	/**
 	 * 
-	 * @return <code>true</code> if {@link InetSocketConnection#isConnected()} returns <code>true</code> and the TLS handshake has completed
+	 * @return <code>true</code> if {@link ChannelConnection#isConnected()} returns <code>true</code> and the TLS handshake has completed
 	 */
 	@Override
 	public boolean isConnected() {
@@ -261,7 +267,7 @@ public class TLSConnection extends InetSocketConnection {
 			status = sslEngine.getHandshakeStatus();
 		}
 		while(true){
-			if(status == HandshakeStatus.NEED_UNWRAP){
+			if(status == HandshakeStatus.NEED_UNWRAP || status.toString().equals("NEED_UNWRAP_AGAIN") /* for java < 9 */){
 				int read = super.readFromSocket();
 				if(read < 0)
 					throw new EOFException("Socket disconnected before handshake completed");

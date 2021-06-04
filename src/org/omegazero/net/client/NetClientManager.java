@@ -13,20 +13,20 @@ package org.omegazero.net.client;
 
 import java.io.IOException;
 
-import org.omegazero.net.client.params.InetConnectionParameters;
+import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.common.NetworkApplication;
-import org.omegazero.net.socket.InetConnection;
+import org.omegazero.net.socket.SocketConnection;
 
-public interface InetClientManager extends NetworkApplication {
+public interface NetClientManager extends NetworkApplication {
 
 	/**
-	 * Creates a new connection instance based on the given parameters to be managed by this <code>InetClientManager</code>.<br>
+	 * Creates a new connection instance based on the given parameters to be managed by this <code>NetClientManager</code>.<br>
 	 * <br>
-	 * {@link InetConnection#connect()} will need to be called on the returned connection instance to initiate the connection.
+	 * {@link SocketConnection#connect(int)} will need to be called on the returned connection instance to initiate the connection.
 	 * 
 	 * @param params Parameters for this connection
 	 * @return The new connection instance
 	 * @throws IOException
 	 */
-	public InetConnection connection(InetConnectionParameters params) throws IOException;
+	public SocketConnection connection(ConnectionParameters params) throws IOException;
 }

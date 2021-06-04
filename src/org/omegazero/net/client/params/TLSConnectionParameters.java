@@ -11,28 +11,19 @@
  */
 package org.omegazero.net.client.params;
 
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 
-public class TLSConnectionParameters extends InetConnectionParameters {
+public class TLSConnectionParameters extends ConnectionParameters {
 
 	private String[] alpnNames;
 	private String[] sniOptions;
 
-	public TLSConnectionParameters(InetSocketAddress remote) {
+	public TLSConnectionParameters(SocketAddress remote) {
 		super(remote);
 	}
 
-	public TLSConnectionParameters(InetSocketAddress remote, InetSocketAddress local) {
+	public TLSConnectionParameters(SocketAddress remote, SocketAddress local) {
 		super(remote, local);
-	}
-
-	public TLSConnectionParameters(InetAddress remoteAddress, int remotePort) {
-		super(remoteAddress, remotePort);
-	}
-
-	public TLSConnectionParameters(String remoteAddress, int remotePort) {
-		super(remoteAddress, remotePort);
 	}
 
 

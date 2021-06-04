@@ -9,35 +9,34 @@
  * is free of defects, merchantable, fit for a particular purpose or non-infringing.
  * The entire risk as to the quality and performance of the Covered Software is with You.
  */
-package org.omegazero.net.client;
+package org.omegazero.net.socket.provider;
 
 import java.io.IOException;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
-import java.util.function.Consumer;
 
-import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.socket.ChannelConnection;
-import org.omegazero.net.socket.impl.PlainConnection;
-import org.omegazero.net.socket.provider.SocketChannelProvider;
 
-public class PlainTCPClientManager extends TCPClientManager {
+public interface ChannelProvider {
 
-	public PlainTCPClientManager() {
-		super();
-	}
-
-	public PlainTCPClientManager(Consumer<Runnable> worker) {
-		super(worker);
-	}
+	public void init(ChannelConnection connection, SelectionKey key);
 
 
-	@Override
-	protected ChannelConnection createConnection(SelectionKey selectionKey, ConnectionParameters params) throws IOException {
-		return new PlainConnection(selectionKey, new SocketChannelProvider(), params.getRemote());
-	}
+	public boolean connect(SocketAddress remote, int timeout) throws IOException;
 
-	@Override
-	protected void handleConnect(ChannelConnection conn) {
-		conn.handleConnect();
-	}
+	public void close() throws IOException;
+
+
+	public int read(ByteBuffer buf) throws IOException;
+
+	public int write(ByteBuffer buf) throws IOException;
+
+
+	public void writeBacklogStarted();
+
+	public void writeBacklogEnded();
+
+
+	public boolean isAvailable();
 }

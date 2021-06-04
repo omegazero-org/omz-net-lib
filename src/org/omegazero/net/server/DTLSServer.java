@@ -12,6 +12,7 @@
 package org.omegazero.net.server;
 
 import java.io.IOException;
+import java.net.SocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Collection;
 import java.util.function.Consumer;
@@ -25,12 +26,12 @@ import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.socket.ChannelConnection;
 import org.omegazero.net.socket.impl.TLSConnection;
-import org.omegazero.net.socket.provider.SocketChannelProvider;
+import org.omegazero.net.socket.provider.DatagramChannelProvider;
 
 /**
- * TLS server for TCP sockets.
+ * TLS server for UDP sockets (DTLS).
  */
-public class TLSServer extends TCPServer {
+public class DTLSServer extends UDPServer {
 
 	private static final Logger logger = LoggerUtil.createLogger();
 
@@ -41,21 +42,21 @@ public class TLSServer extends TCPServer {
 
 	/**
 	 * 
-	 * @param sslContext The SSL context to be used by the server
-	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
+	 * @param sslContext The SSL context to be used by the server. The context must be initialized with protocol "DTLS"
+	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
 	 */
-	public TLSServer(Collection<Integer> ports, SSLContext sslContext) {
+	public DTLSServer(Collection<Integer> ports, SSLContext sslContext) {
 		super(ports);
 		this.sslContext = sslContext;
 	}
 
 	/**
 	 * 
-	 * @param sslContext The SSL context to be used by the server
-	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
+	 * @param sslContext The SSL context to be used by the server. The context must be initialized with protocol "DTLS"
+	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
 	 */
-	public TLSServer(String bindAddress, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout, SSLContext sslContext) {
-		super(bindAddress, ports, backlog, worker, idleTimeout);
+	public DTLSServer(String bindAddress, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize, SSLContext sslContext) {
+		super(bindAddress, ports, worker, idleTimeout, receiveBufferSize);
 		this.sslContext = sslContext;
 	}
 
@@ -82,16 +83,15 @@ public class TLSServer extends TCPServer {
 
 
 	@Override
-	protected ChannelConnection handleConnection(SelectionKey selectionKey) throws IOException {
-		ChannelConnection conn = new TLSConnection(selectionKey, new SocketChannelProvider(), this.sslContext, false, this.supportedApplicationLayerProtocols);
+	protected ChannelConnection handleConnection(SelectionKey serverKey, SocketAddress remote) throws IOException {
+		ChannelConnection conn = new TLSConnection(serverKey, new DatagramChannelProvider(remote, super::writeBacklogStarted), remote, this.sslContext, false,
+				this.supportedApplicationLayerProtocols, null);
 
-		// see note in PlainTCPServer
 		conn.setOnError((e) -> {
-			// if it is a SSLHandshakeException, no need to be verbose because it isn't a fatal error (may just be caused because a client
-			// is bad or doesn't accept a certificate)
+			// see notes in TLSServer
 			if(e instanceof SSLHandshakeException)
 				logger.warn("TLS handshake failed (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
-			else if(e instanceof SSLException) // same applies to SSLException, for example when a client sends a malformed SSL packet, a SSLException is thrown
+			else if(e instanceof SSLException)
 				logger.warn("TLS error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
 			else if(e instanceof IOException)
 				logger.warn("Socket Error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());

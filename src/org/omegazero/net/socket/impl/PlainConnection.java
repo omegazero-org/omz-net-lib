@@ -12,20 +12,22 @@
 package org.omegazero.net.socket.impl;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
-import org.omegazero.net.socket.InetSocketConnection;
+import org.omegazero.net.socket.ChannelConnection;
+import org.omegazero.net.socket.provider.ChannelProvider;
 
-public class PlainConnection extends InetSocketConnection {
+public class PlainConnection extends ChannelConnection {
 
-	public PlainConnection(SelectionKey selectionKey) throws IOException {
-		this(selectionKey, null);
+	public PlainConnection(SelectionKey selectionKey, ChannelProvider provider) throws IOException {
+		this(selectionKey, provider, null);
 	}
 
-	public PlainConnection(SelectionKey selectionKey, InetSocketAddress remote) throws IOException {
-		super(selectionKey, remote);
+	public PlainConnection(SelectionKey selectionKey, ChannelProvider provider, SocketAddress remote) throws IOException {
+		super(selectionKey, provider, remote);
+
 		this.createBuffers();
 	}
 
@@ -64,18 +66,20 @@ public class PlainConnection extends InetSocketConnection {
 	}
 
 	@Override
-	public void write(byte[] a) {
+	public void write(byte[] data) {
 		try{
-			if(!super.hasConnected()){
-				super.queueWrite(a);
-				return;
+			synchronized(this){
+				if(!super.hasConnected()){
+					super.queueWrite(data);
+					return;
+				}
 			}
 			synchronized(super.writeBuf){
 				super.writeBuf.clear();
 				int written = 0;
-				while(written < a.length){
-					int wr = Math.min(super.writeBuf.remaining(), a.length - written);
-					super.writeBuf.put(a, written, wr);
+				while(written < data.length){
+					int wr = Math.min(super.writeBuf.remaining(), data.length - written);
+					super.writeBuf.put(data, written, wr);
 					super.writeBuf.flip();
 					super.writeToSocket();
 					super.writeBuf.compact();
