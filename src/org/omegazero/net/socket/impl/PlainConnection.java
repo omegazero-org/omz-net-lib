@@ -51,7 +51,6 @@ public class PlainConnection extends ChannelConnection {
 					if(super.readBuf.hasRemaining()){
 						byte[] a = new byte[super.readBuf.remaining()];
 						super.readBuf.get(a);
-						super.readBuf.compact();
 						return a;
 					}else
 						return null;
