@@ -15,6 +15,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.util.Arrays;
@@ -139,7 +140,6 @@ public class TLSConnection extends ChannelConnection {
 			if(!super.isConnected())
 				return null;
 			synchronized(super.readBuf){
-				super.readBuf.clear();
 				if(this.handshakeComplete){
 					int read = super.readFromSocket();
 					if(read > 0){
@@ -150,8 +150,8 @@ public class TLSConnection extends ChannelConnection {
 					}
 				}else{
 					this.doTLSHandshake();
-					super.readBuf.flip();
-					if(this.handshakeComplete && super.readBuf.hasRemaining()){
+					if(this.handshakeComplete && super.readBuf.position() > 0){ // there is still data in the buffer after the handshake
+						super.readBuf.flip();
 						return this.readApplicationData();
 					}
 				}
@@ -242,7 +242,11 @@ public class TLSConnection extends ChannelConnection {
 
 
 	private byte[] readApplicationData() throws IOException {
+		this.readBufUnwrapped.clear();
 		SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
+		super.readBuf.compact();
+		if(!super.readBuf.hasRemaining()) // the engine requires more data than the buffer can hold (shouldnt happen because buffer is the maximum size of a TLS packet)
+			throw new BufferOverflowException();
 		if(result.getStatus() == Status.CLOSED)
 			this.close();
 		else if(result.getStatus() == Status.OK){
@@ -250,9 +254,10 @@ public class TLSConnection extends ChannelConnection {
 			if(this.readBufUnwrapped.hasRemaining()){
 				byte[] a = new byte[this.readBufUnwrapped.remaining()];
 				this.readBufUnwrapped.get(a);
-				this.readBufUnwrapped.compact();
 				return a;
 			}
+		}else if(result.getStatus() == Status.BUFFER_UNDERFLOW){
+			return null;
 		}else
 			throw new SSLException("Read SSL unwrap failed: " + result.getStatus());
 		return null;
@@ -274,9 +279,9 @@ public class TLSConnection extends ChannelConnection {
 				super.readBuf.flip();
 				SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
 				super.readBuf.compact();
-				// BUFFER_UNDERFLOW here means no data is available; for some reason we can't just immediately return when we read 0 bytes above,
-				// because then SSLEngine will break; instead, cause buffer underflow and loop around to return here
-				if(read == 0 && result.getStatus() == Status.BUFFER_UNDERFLOW)
+				if(!super.readBuf.hasRemaining())
+					throw new BufferOverflowException();
+				if(result.getStatus() == Status.BUFFER_UNDERFLOW) // wait for more data
 					return;
 				else if(result.getStatus() != Status.OK)
 					throw new SSLHandshakeException("Unexpected status after SSL unwrap: " + result.getStatus());
@@ -298,7 +303,7 @@ public class TLSConnection extends ChannelConnection {
 					r.run();
 				}
 				status = sslEngine.getHandshakeStatus();
-			}else if(status == HandshakeStatus.FINISHED || status == HandshakeStatus.NOT_HANDSHAKING){
+			}else if(status == HandshakeStatus.NOT_HANDSHAKING){
 				this.handshakeComplete = true;
 				this.alpnProtocol = this.sslEngine.getApplicationProtocol();
 				logger.debug("SSL Handshake completed: peer=" + super.getRemoteAddress() + ", cipher=" + this.sslEngine.getSession().getCipherSuite(), ", alp=",
