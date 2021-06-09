@@ -128,6 +128,16 @@ public abstract class ChannelConnection extends SocketConnection {
 		return this.lastIOTime;
 	}
 
+	@Override
+	public boolean isWritable() {
+		return this.writeBacklog.size() == 0 && (this.writeBufTemp == null || !this.writeBufTemp.hasRemaining());
+	}
+
+	@Override
+	public void setReadBlock(boolean block) {
+		this.provider.setReadBlock(block);
+	}
+
 
 	public ChannelProvider getProvider() {
 		return this.provider;
@@ -193,6 +203,7 @@ public abstract class ChannelConnection extends SocketConnection {
 			}
 			if(!this.writeBufTemp.hasRemaining()){
 				this.provider.writeBacklogEnded();
+				super.handleWritable();
 				return true;
 			}else{
 				return false;
@@ -224,6 +235,8 @@ public abstract class ChannelConnection extends SocketConnection {
 				}
 				written += w;
 			}
+			if(this.isWritable())
+				super.handleWritable();
 			return written;
 		}
 	}

@@ -34,10 +34,19 @@ public class DatagramChannelProvider implements ChannelProvider {
 
 	private Deque<byte[]> readBacklog = new LinkedList<>();
 
+	/**
+	 * This constructor should be used if the datagram channel is used as a client which is about to be connected to a server.
+	 */
 	public DatagramChannelProvider() { // for outgoing requests; remote is not needed because socket is connected and notifyWriteBacklog is only for server channels
 		this(null, null);
 	}
 
+	/**
+	 * This constructor should be used if the datagram channel is used as a server.
+	 * 
+	 * @param remote             The address of the client
+	 * @param notifyWriteBacklog Callback when the channel is experiencing write backlog
+	 */
 	public DatagramChannelProvider(SocketAddress remote, Consumer<ChannelConnection> notifyWriteBacklog) { // for incoming requests
 		this.remote = remote;
 		this.notifyWriteBacklog = notifyWriteBacklog;
@@ -103,26 +112,47 @@ public class DatagramChannelProvider implements ChannelProvider {
 
 	@Override
 	public void writeBacklogStarted() {
-		if(this.notifyWriteBacklog != null) // this is a server datagram channel and we shouldnt edit the selection key
+		if(this.notifyWriteBacklog != null)
 			this.notifyWriteBacklog.accept(this.connection);
 
-		int ops = this.selectionKey.interestOps();
-		if((ops & SelectionKey.OP_WRITE) == 0){
-			this.selectionKey.interestOps(ops | SelectionKey.OP_WRITE);
-			this.selectionKey.selector().wakeup();
-		}
+		this.enableOp(SelectionKey.OP_WRITE);
 	}
 
 	@Override
 	public void writeBacklogEnded() {
 		if(this.notifyWriteBacklog == null)
-			this.selectionKey.interestOps(this.selectionKey.interestOps() & ~SelectionKey.OP_WRITE);
+			this.enableOp(SelectionKey.OP_WRITE);
 		// else the manager should notice itself that the backlog is flushed when flushWriteBacklog returns true and remove OP_WRITE
+	}
+
+
+	@Override
+	public void setReadBlock(boolean block) {
+		if(this.notifyWriteBacklog == null){
+			if(block)
+				this.disableOp(SelectionKey.OP_READ);
+			else
+				this.enableOp(SelectionKey.OP_READ);
+		}
+		// this is not supported for server channels
 	}
 
 
 	@Override
 	public boolean isAvailable() {
 		return true; // datagram channels can always send and receive data
+	}
+
+
+	private synchronized void enableOp(int op) {
+		int ops = this.selectionKey.interestOps();
+		if((ops & op) == 0){
+			this.selectionKey.interestOps(ops | op);
+			this.selectionKey.selector().wakeup();
+		}
+	}
+
+	private synchronized void disableOp(int op) {
+		this.selectionKey.interestOps(this.selectionKey.interestOps() & ~op);
 	}
 }

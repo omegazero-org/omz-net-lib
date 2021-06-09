@@ -78,21 +78,39 @@ public class SocketChannelProvider implements ChannelProvider {
 
 	@Override
 	public void writeBacklogStarted() {
-		int ops = this.selectionKey.interestOps();
-		if((ops & SelectionKey.OP_WRITE) == 0){
-			this.selectionKey.interestOps(ops | SelectionKey.OP_WRITE);
-			this.selectionKey.selector().wakeup();
-		}
+		this.enableOp(SelectionKey.OP_WRITE);
 	}
 
 	@Override
 	public void writeBacklogEnded() {
-		this.selectionKey.interestOps(this.selectionKey.interestOps() & ~SelectionKey.OP_WRITE);
+		this.disableOp(SelectionKey.OP_WRITE);
+	}
+
+
+	@Override
+	public void setReadBlock(boolean block) {
+		if(block)
+			this.disableOp(SelectionKey.OP_READ);
+		else
+			this.enableOp(SelectionKey.OP_READ);
 	}
 
 
 	@Override
 	public boolean isAvailable() {
 		return this.socket.isConnected();
+	}
+
+
+	private synchronized void enableOp(int op) {
+		int ops = this.selectionKey.interestOps();
+		if((ops & op) == 0){
+			this.selectionKey.interestOps(ops | op);
+			this.selectionKey.selector().wakeup();
+		}
+	}
+
+	private synchronized void disableOp(int op) {
+		this.selectionKey.interestOps(this.selectionKey.interestOps() & ~op);
 	}
 }

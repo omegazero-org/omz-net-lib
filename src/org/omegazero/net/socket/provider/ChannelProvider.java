@@ -38,5 +38,8 @@ public interface ChannelProvider {
 	public void writeBacklogEnded();
 
 
+	public void setReadBlock(boolean block);
+
+
 	public boolean isAvailable();
 }

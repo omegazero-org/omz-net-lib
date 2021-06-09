@@ -24,6 +24,7 @@ public abstract class SocketConnection {
 	private Runnable onConnect;
 	private Runnable onTimeout;
 	private Consumer<byte[]> onData;
+	private Runnable onWritable;
 	private Runnable onClose;
 	private Consumer<Throwable> onError;
 	private Consumer<SocketConnection> onLocalConnect;
@@ -64,7 +65,8 @@ public abstract class SocketConnection {
 	/**
 	 * Writes data to this connection for delivery to the peer host. <br>
 	 * <br>
-	 * This function is non-blocking.<br>
+	 * This function is non-blocking and may store data in a temporary write buffer if the underlying socket is busy. An application should try to respect the value of
+	 * {@link #isWritable()} to reduce memory consumption by such write buffer if a lot of data is being written.<br>
 	 * <br>
 	 * If this method is called before the <code>onConnect</code> event, the data is queued in a temporary buffer and written out when the socket connects.
 	 * 
@@ -100,6 +102,20 @@ public abstract class SocketConnection {
 	 * @return The last time any data was sent over this connection, either incoming or outgoing, as returned by {@link System#currentTimeMillis()}
 	 */
 	public abstract long getLastIOTime();
+
+	/**
+	 * 
+	 * @return <code>true</code> if this socket is writable, meaning data passed to {@link #write(byte[])} will not be buffered but written to the socket directly
+	 */
+	public abstract boolean isWritable();
+
+	/**
+	 * Enables or disables read blocking. If set to <code>true</code>, the implementation will attempt to block incoming data from being processed and delay it until this is
+	 * set to <code>false</code> again. Note that the implementation may still fire <code>onData</code> events while this option is set to <code>true</code>.
+	 * 
+	 * @param block Whether to attempt to block incoming data
+	 */
+	public abstract void setReadBlock(boolean block);
 
 
 	/**
@@ -161,6 +177,15 @@ public abstract class SocketConnection {
 		return true;
 	}
 
+	public final void handleWritable() {
+		try{
+			if(this.onWritable != null)
+				this.onWritable.run();
+		}catch(Exception e){
+			this.handleError(e);
+		}
+	}
+
 	public final void handleError(Throwable e) {
 		if(this.onError != null){
 			this.onError.accept(e);
@@ -207,6 +232,15 @@ public abstract class SocketConnection {
 	 */
 	public final void setOnData(Consumer<byte[]> onData) {
 		this.onData = onData;
+	}
+
+	/**
+	 * Sets a callback that is called when this socket is ready for writing again after a {@link #write(byte[])} operation.
+	 * 
+	 * @param onWritable The callback
+	 */
+	public final void setOnWritable(Runnable onWritable) {
+		this.onWritable = onWritable;
 	}
 
 	/**
