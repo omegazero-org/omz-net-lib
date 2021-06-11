@@ -129,7 +129,11 @@ public class TLSConnection extends ChannelConnection {
 		super.readBuf = ByteBuffer.allocate(this.sslEngine.getSession().getPacketBufferSize());
 		// no idea why but apparently SSLEngine requires a massive buffer for DTLS even though it only writes less than 100 bytes, otherwise BUFFER_OVERFLOW
 		super.writeBuf = ByteBuffer.allocate(this.sslEngine.getSession().getPacketBufferSize() * 2);
-		this.readBufUnwrapped = ByteBuffer.allocate(this.sslEngine.getSession().getApplicationBufferSize());
+		// the * 2 here is when a large packet has been read from readBuf and there is the start of the next (large) packet in the readBuf, but it is incomplete
+		// (because both packets are near maximum TLS packet size and dont fit in readBuf together), the SSLEngine will report BUFFER_OVERFLOW because it (presumably)
+		// detects that there wouldnt be enough space in readBufUnwrapped for the next large packet, even though it isnt even fully received yet
+		// (BUFFER_UNDERFLOW would be better in that case)
+		this.readBufUnwrapped = ByteBuffer.allocate(this.sslEngine.getSession().getApplicationBufferSize() * 2);
 		this.writeBufUnwrapped = ByteBuffer.allocate(this.sslEngine.getSession().getApplicationBufferSize());
 	}
 
@@ -243,23 +247,27 @@ public class TLSConnection extends ChannelConnection {
 
 	private byte[] readApplicationData() throws IOException {
 		this.readBufUnwrapped.clear();
-		SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
+		while(super.readBuf.hasRemaining()){
+			SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
+			if(result.getStatus() == Status.CLOSED){
+				this.close();
+				return null;
+			}else if(result.getStatus() == Status.OK){
+				continue;
+			}else if(result.getStatus() == Status.BUFFER_UNDERFLOW){
+				break;
+			}else
+				throw new SSLException("Read SSL unwrap failed: " + result.getStatus());
+		}
 		super.readBuf.compact();
 		if(!super.readBuf.hasRemaining()) // the engine requires more data than the buffer can hold (shouldnt happen because buffer is the maximum size of a TLS packet)
 			throw new BufferOverflowException();
-		if(result.getStatus() == Status.CLOSED)
-			this.close();
-		else if(result.getStatus() == Status.OK){
-			this.readBufUnwrapped.flip();
-			if(this.readBufUnwrapped.hasRemaining()){
-				byte[] a = new byte[this.readBufUnwrapped.remaining()];
-				this.readBufUnwrapped.get(a);
-				return a;
-			}
-		}else if(result.getStatus() == Status.BUFFER_UNDERFLOW){
-			return null;
-		}else
-			throw new SSLException("Read SSL unwrap failed: " + result.getStatus());
+		this.readBufUnwrapped.flip();
+		if(this.readBufUnwrapped.hasRemaining()){
+			byte[] a = new byte[this.readBufUnwrapped.remaining()];
+			this.readBufUnwrapped.get(a);
+			return a;
+		}
 		return null;
 	}
 
