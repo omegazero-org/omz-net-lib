@@ -62,7 +62,11 @@ public abstract class TCPClientManager extends ConnectionSelectorHandler impleme
 
 
 	private void finishConnect(SelectionKey key) throws IOException {
-		key.interestOps(SelectionKey.OP_READ);
+		synchronized(key){
+			if(!key.isValid())
+				return;
+			key.interestOps(SelectionKey.OP_READ);
+		}
 		this.handleConnect((ChannelConnection) key.attachment());
 	}
 

@@ -61,7 +61,9 @@ public class SocketChannelProvider implements ChannelProvider {
 	public void close() throws IOException {
 		if(this.connectTimeout >= 0)
 			Tasks.clear(this.connectTimeout);
-		this.socket.close();
+		synchronized(this.selectionKey){
+			this.socket.close();
+		}
 	}
 
 

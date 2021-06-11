@@ -17,7 +17,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.util.Deque;
-import java.util.LinkedList;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Consumer;
 
 import org.omegazero.net.socket.ChannelConnection;
@@ -32,7 +32,7 @@ public class DatagramChannelProvider implements ChannelProvider {
 
 	private DatagramChannel socket;
 
-	private Deque<byte[]> readBacklog = new LinkedList<>();
+	private Deque<byte[]> readBacklog = new ConcurrentLinkedDeque<>();
 
 	/**
 	 * This constructor should be used if the datagram channel is used as a client which is about to be connected to a server.
@@ -79,7 +79,9 @@ public class DatagramChannelProvider implements ChannelProvider {
 		// only close this DatagramChannel if it was started as a client connection because otherwise the channel represents a server socket in which
 		// case we shouldnt close it
 		if(this.socket.isConnected()){
-			this.socket.close();
+			synchronized(this.selectionKey){
+				this.socket.close();
+			}
 		}
 	}
 
