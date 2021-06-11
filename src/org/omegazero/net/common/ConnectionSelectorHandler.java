@@ -45,9 +45,9 @@ public abstract class ConnectionSelectorHandler extends SelectorHandler {
 
 
 	/**
-	 * Notify this <code>ConnectionSelectorHandler</code> that a connection has been established.
+	 * Notify this <code>ConnectionSelectorHandler</code> that a connection was closed locally by a call to {@link SocketConnection#close()}.
 	 * 
-	 * @param conn The connection that finished connecting
+	 * @param conn The connection that closed
 	 */
 	protected void onConnectionClosed(SocketConnection conn) {
 		synchronized(this.closedConnections){
