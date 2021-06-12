@@ -29,11 +29,10 @@ public class TLSConnectionParameters extends ConnectionParameters {
 
 	/**
 	 * Sets the list of requested application layer protocol names to be negotiated using TLS ALPN (Application Layer Protocol Negotiation). The elements in this list should
-	 * be ordered from most-preferred to least-preferred protocol name.<br>
-	 * <br>
-	 * If not set or <code>null</code> is passed, the first protocol name presented by the server is selected.
+	 * be ordered from most-preferred to least-preferred protocol name.
 	 * 
 	 * @param alpnNames The list of requested protocol names
+	 * @see javax.net.ssl.SSLParameters#setApplicationProtocols(String[])
 	 */
 	public void setAlpnNames(String[] alpnNames) {
 		this.alpnNames = alpnNames;

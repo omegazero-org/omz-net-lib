@@ -29,6 +29,7 @@ import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLParameters;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
@@ -44,7 +45,6 @@ public class TLSConnection extends ChannelConnection {
 	private static final boolean disableWeakCiphers = PropertyUtil.getBoolean("org.omegazero.net.tls.disableWeakCiphers", false);
 
 	private final SSLContext sslContext;
-	private final String[] alpnNames;
 
 	private final SSLEngine sslEngine;
 
@@ -63,7 +63,6 @@ public class TLSConnection extends ChannelConnection {
 			String[] requestedServerNames) throws IOException {
 		super(selectionKey, provider, remote);
 		this.sslContext = sslContext;
-		this.alpnNames = alpnNames;
 
 		if(super.getRemoteAddress() != null && super.getRemoteAddress() instanceof InetSocketAddress){
 			InetSocketAddress inaddr = (InetSocketAddress) super.getRemoteAddress();
@@ -71,16 +70,6 @@ public class TLSConnection extends ChannelConnection {
 		}else
 			this.sslEngine = this.sslContext.createSSLEngine();
 		this.sslEngine.setUseClientMode(client);
-		this.sslEngine.setHandshakeApplicationProtocolSelector((sslEngine, list) -> {
-			if(TLSConnection.this.alpnNames != null){
-				for(String s : TLSConnection.this.alpnNames){
-					if(list.contains(s))
-						return s;
-				}
-			}else if(list.size() > 0)
-				return list.get(0);
-			return null;
-		});
 
 		if(minTLSVersion >= 0){
 			String[] protoList = this.sslEngine.getEnabledProtocols();
@@ -112,13 +101,20 @@ public class TLSConnection extends ChannelConnection {
 			}
 		}
 
+		SSLParameters sslParams = this.sslEngine.getSSLParameters();
+
+		if(alpnNames != null)
+			sslParams.setApplicationProtocols(alpnNames);
+
 		if(requestedServerNames != null){
 			SNIServerName[] serverNames = new SNIServerName[requestedServerNames.length];
 			for(int i = 0; i < requestedServerNames.length; i++){
 				serverNames[i] = new SNIHostName(requestedServerNames[i]);
 			}
-			this.sslEngine.getSSLParameters().setServerNames(Arrays.asList(serverNames));
+			sslParams.setServerNames(Arrays.asList(serverNames));
 		}
+
+		this.sslEngine.setSSLParameters(sslParams);
 
 		this.createBuffers();
 	}
