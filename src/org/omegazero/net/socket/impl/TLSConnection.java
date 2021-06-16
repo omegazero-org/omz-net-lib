@@ -244,11 +244,14 @@ public class TLSConnection extends ChannelConnection {
 	private byte[] readApplicationData() throws IOException {
 		this.readBufUnwrapped.clear();
 		while(super.readBuf.hasRemaining()){
+			int beforeDataLen = super.readBuf.remaining();
 			SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
 			if(result.getStatus() == Status.CLOSED){
 				this.close();
 				return null;
 			}else if(result.getStatus() == Status.OK){
+				if(super.readBuf.remaining() >= beforeDataLen)
+					throw new IOException("unwrap returned OK but no data was read");
 				continue;
 			}else if(result.getStatus() == Status.BUFFER_UNDERFLOW){
 				break;
@@ -280,6 +283,7 @@ public class TLSConnection extends ChannelConnection {
 				int read = super.readFromSocket();
 				if(read < 0)
 					throw new EOFException("Socket disconnected before handshake completed");
+				int beforeRemaining = super.readBuf.remaining();
 				super.readBuf.flip();
 				SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
 				super.readBuf.compact();
@@ -289,6 +293,8 @@ public class TLSConnection extends ChannelConnection {
 					return;
 				else if(result.getStatus() != Status.OK)
 					throw new SSLHandshakeException("Unexpected status after SSL unwrap: " + result.getStatus());
+				else if(super.readBuf.remaining() <= beforeRemaining)
+					throw new IOException("unwrap returned OK but no data was read");
 				status = sslEngine.getHandshakeStatus();
 			}else if(status == HandshakeStatus.NEED_WRAP){
 				super.writeBuf.clear();
