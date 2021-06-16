@@ -12,6 +12,7 @@
 package org.omegazero.net.server;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Collection;
@@ -44,8 +45,8 @@ public class PlainUDPServer extends UDPServer {
 	 * 
 	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
 	 */
-	public PlainUDPServer(String bindAddress, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize) {
-		super(bindAddress, ports, worker, idleTimeout, receiveBufferSize);
+	public PlainUDPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize) {
+		super(bindAddresses, ports, worker, idleTimeout, receiveBufferSize);
 	}
 
 

@@ -18,7 +18,9 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.ServerSocketChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -51,7 +53,7 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 	private long connectionTimeoutCheckInterval;
 
 
-	protected final InetAddress bindAddress;
+	protected final Collection<InetAddress> bindAddresses;
 	protected final Collection<Integer> ports;
 	protected final Consumer<Runnable> worker;
 	private final ByteBuffer receiveBuffer;
@@ -75,23 +77,19 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 	 * To initialize the server, {@link NetServer#init()} of this object must be called. After the call succeeded, the server will listen on the specified local address
 	 * (<b>bindAddress</b>) on the given <b>ports</b> and {@link NetServer#start()} must be called to start processing incoming and outgoing data.
 	 * 
-	 * @param bindAddress       The local address to bind to (see {@link DatagramChannel#bind(java.net.SocketAddress)}). May be <code>null</code> to use an automatically
-	 *                          assigned address
+	 * @param bindAddresses     A collection of local addresses to bind to (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)}). May be <code>null</code> to use
+	 *                          an automatically assigned address
 	 * @param ports             The list of ports to listen on
 	 * @param worker            A callback accepting tasks to run that may require increased processing time. May be <code>null</code> to run everything using a single thread
 	 * @param idleTimeout       The time in milliseconds to keep connections that had no traffic. Metadata for UDP connections not closed using
 	 *                          {@link SocketConnection#close()} or by this idle timeout will be stored indefinitely, which should be avoided
 	 * @param receiveBufferSize The size of the receive buffer. Should be set to the maximum expected packet size
 	 */
-	public UDPServer(String bindAddress, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize) {
-		if(bindAddress != null)
-			try{
-				this.bindAddress = InetAddress.getByName(bindAddress);
-			}catch(Exception e){
-				throw new IllegalArgumentException("bindAddress is invalid", e);
-			}
+	public UDPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize) {
+		if(bindAddresses != null)
+			this.bindAddresses = bindAddresses;
 		else
-			this.bindAddress = null;
+			this.bindAddresses = Arrays.asList((InetAddress) null);
 		this.ports = Objects.requireNonNull(ports, "ports must not be null");
 		if(worker != null)
 			this.worker = worker;
@@ -107,16 +105,19 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 		super.initSelector();
 		for(int p : this.ports){
 			this.listenOnPort(p);
-			logger.info("Listening UDP on port " + p);
 		}
 	}
 
 	private void listenOnPort(int port) throws IOException {
-		DatagramChannel dc = DatagramChannel.open();
-		dc.bind(new InetSocketAddress(this.bindAddress, port));
-		dc.configureBlocking(false);
-		super.registerChannel(dc, SelectionKey.OP_READ);
-		this.serverChannels.add(dc);
+		for(InetAddress bindAddress : this.bindAddresses){
+			DatagramChannel dc = DatagramChannel.open();
+			InetSocketAddress soaddr = new InetSocketAddress(bindAddress, port);
+			dc.bind(soaddr);
+			logger.info("Listening UDP on " + soaddr.getAddress().getHostAddress() + ":" + soaddr.getPort());
+			dc.configureBlocking(false);
+			super.registerChannel(dc, SelectionKey.OP_READ);
+			this.serverChannels.add(dc);
+		}
 	}
 
 
@@ -275,9 +276,5 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 		if(idleTimeout <= 0)
 			throw new IllegalArgumentException("idleTimeout must be a positive integer");
 		this.idleTimeout = idleTimeout;
-	}
-
-	public InetAddress getBindAddress() {
-		return this.bindAddress;
 	}
 }

@@ -18,6 +18,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -46,12 +47,15 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 	private long connectionTimeoutCheckInterval;
 
 
-	protected final InetAddress bindAddress;
+	protected final Collection<InetAddress> bindAddresses;
 	protected final Collection<Integer> ports;
 	protected final int backlog;
 	protected final Consumer<Runnable> worker;
 
 	private long idleTimeout;
+
+	// only required for idle timeouts
+	private final List<ChannelConnection> connections = new java.util.LinkedList<>();
 
 	/**
 	 * 
@@ -67,22 +71,18 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 	 * To initialize the server, {@link NetServer#init()} of this object must be called. After the call succeeded, the server will listen on the specified local address
 	 * (<b>bindAddress</b>) on the given <b>ports</b> and {@link NetServer#start()} must be called to start processing incoming connection requests and data.
 	 * 
-	 * @param bindAddress The local address to bind to (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)}). May be <code>null</code> to use an automatically
-	 *                    assigned address
-	 * @param ports       The list of ports to listen on
-	 * @param backlog     The maximum number of pending connections (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)}). May be 0 to use a default value
-	 * @param worker      A callback accepting tasks to run that may require increased processing time. May be <code>null</code> to run everything using a single thread
-	 * @param idleTimeout The time in milliseconds to keep connections that had no traffic. May be 0 to disable closing idle connections
+	 * @param bindAddresses A collection of local addresses to bind to (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)}). May be <code>null</code> to use an
+	 *                      automatically assigned address
+	 * @param ports         The list of ports to listen on
+	 * @param backlog       The maximum number of pending connections (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)}). May be 0 to use a default value
+	 * @param worker        A callback accepting tasks to run that may require increased processing time. May be <code>null</code> to run everything using a single thread
+	 * @param idleTimeout   The time in milliseconds to keep connections that had no traffic. May be 0 to disable closing idle connections
 	 */
-	public TCPServer(String bindAddress, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout) {
-		if(bindAddress != null)
-			try{
-				this.bindAddress = InetAddress.getByName(bindAddress);
-			}catch(Exception e){
-				throw new IllegalArgumentException("bindAddress is invalid", e);
-			}
+	public TCPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout) {
+		if(bindAddresses != null)
+			this.bindAddresses = bindAddresses;
 		else
-			this.bindAddress = null;
+			this.bindAddresses = Arrays.asList((InetAddress) null);
 		this.ports = Objects.requireNonNull(ports, "ports must not be null");
 		this.backlog = backlog;
 		if(worker != null)
@@ -98,16 +98,19 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 		super.initSelector();
 		for(int p : this.ports){
 			this.listenOnPort(p);
-			logger.info("Listening on port " + p);
 		}
 	}
 
 	private void listenOnPort(int port) throws IOException {
-		ServerSocketChannel ssc = ServerSocketChannel.open();
-		ssc.bind(new InetSocketAddress(this.bindAddress, port), this.backlog);
-		ssc.configureBlocking(false);
-		super.registerChannel(ssc, SelectionKey.OP_ACCEPT);
-		this.serverSockets.add(ssc);
+		for(InetAddress bindAddress : this.bindAddresses){
+			ServerSocketChannel ssc = ServerSocketChannel.open();
+			InetSocketAddress soaddr = new InetSocketAddress(bindAddress, port);
+			ssc.bind(soaddr, this.backlog);
+			logger.info("Listening TCP on " + soaddr.getAddress().getHostAddress() + ":" + soaddr.getPort());
+			ssc.configureBlocking(false);
+			super.registerChannel(ssc, SelectionKey.OP_ACCEPT);
+			this.serverSockets.add(ssc);
+		}
 	}
 
 
@@ -128,9 +131,10 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 				return;
 			long currentTime = System.currentTimeMillis();
 			try{
-				for(SelectionKey k : super.selectorKeys()){
-					if(k.attachment() instanceof ChannelConnection){
-						ChannelConnection conn = (ChannelConnection) k.attachment();
+				synchronized(this.connections){
+					// originally, this was just an iteration over the selector key set (which would not require the connections list),
+					// but it is apparently impossible to properly synchronize the set, so this needs to be done instead
+					for(ChannelConnection conn : this.connections){
 						long delta = currentTime - conn.getLastIOTime();
 						if(delta < 0 || delta > timeout){
 							logger.debug("Idle Timeout: ", conn.getRemoteAddress(), " (", delta, "ms)");
@@ -165,6 +169,15 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 
 
 	@Override
+	protected void handleConnectionClosed(SocketConnection conn) throws IOException {
+		synchronized(this.connections){
+			if(!this.connections.remove(conn))
+				logger.warn("Closed connection to ", conn.getRemoteAddress(), " was not in connections list");
+		}
+		super.handleConnectionClosed(conn);
+	}
+
+	@Override
 	protected void handleSelectedKey(SelectionKey key) throws IOException {
 		if(key.isAcceptable()){
 			ServerSocketChannel serverChannel = (ServerSocketChannel) key.channel();
@@ -189,6 +202,10 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 			});
 
 			this.handleConnectionPost(conn);
+
+			synchronized(this.connections){
+				this.connections.add(conn);
+			}
 		}else if(key.isReadable()){
 			ChannelConnection conn = (ChannelConnection) key.attachment();
 			byte[] data = conn.read();
@@ -211,10 +228,6 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 
 	public void setIdleTimeout(long idleTimeout) {
 		this.idleTimeout = idleTimeout;
-	}
-
-	public InetAddress getBindAddress() {
-		return this.bindAddress;
 	}
 
 	public int getBacklog() {

@@ -12,6 +12,7 @@
 package org.omegazero.net.server;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Collection;
 import java.util.function.Consumer;
@@ -43,8 +44,8 @@ public class PlainTCPServer extends TCPServer {
 	 * 
 	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
 	 */
-	public PlainTCPServer(String bindAddress, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout) {
-		super(bindAddress, ports, backlog, worker, idleTimeout);
+	public PlainTCPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout) {
+		super(bindAddresses, ports, backlog, worker, idleTimeout);
 	}
 
 

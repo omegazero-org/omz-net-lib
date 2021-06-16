@@ -12,6 +12,7 @@
 package org.omegazero.net.server;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Collection;
@@ -55,8 +56,9 @@ public class DTLSServer extends UDPServer {
 	 * @param sslContext The SSL context to be used by the server. The context must be initialized with protocol "DTLS"
 	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
 	 */
-	public DTLSServer(String bindAddress, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize, SSLContext sslContext) {
-		super(bindAddress, ports, worker, idleTimeout, receiveBufferSize);
+	public DTLSServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize,
+			SSLContext sslContext) {
+		super(bindAddresses, ports, worker, idleTimeout, receiveBufferSize);
 		this.sslContext = sslContext;
 	}
 

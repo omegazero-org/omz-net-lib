@@ -12,6 +12,7 @@
 package org.omegazero.net.server;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Collection;
 import java.util.function.Consumer;
@@ -54,8 +55,8 @@ public class TLSServer extends TCPServer {
 	 * @param sslContext The SSL context to be used by the server
 	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
 	 */
-	public TLSServer(String bindAddress, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout, SSLContext sslContext) {
-		super(bindAddress, ports, backlog, worker, idleTimeout);
+	public TLSServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout, SSLContext sslContext) {
+		super(bindAddresses, ports, backlog, worker, idleTimeout);
 		this.sslContext = sslContext;
 	}
 
