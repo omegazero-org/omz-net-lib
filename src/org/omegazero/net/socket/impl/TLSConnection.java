@@ -201,7 +201,6 @@ public class TLSConnection extends ChannelConnection {
 	@Override
 	public void close() {
 		this.sslEngine.closeOutbound();
-		this.sslEngine.getSession().invalidate();
 		if(super.isConnected()){
 			synchronized(super.writeBuf){
 				try{
