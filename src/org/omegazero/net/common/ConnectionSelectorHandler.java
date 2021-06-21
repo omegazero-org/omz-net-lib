@@ -12,8 +12,9 @@
 package org.omegazero.net.common;
 
 import java.io.IOException;
-import java.util.HashSet;
+import java.util.Collection;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
@@ -30,7 +31,7 @@ public abstract class ConnectionSelectorHandler extends SelectorHandler {
 	// preferably the thread executing the selectorLoop() should emit all events and that likely wouldnt be the case because close() may be called by any thread.
 	// this is now the primary way of communicating closes, including when the peer closes the connection
 	// subclasses must call setOnLocalClose(super::onConnectionClosed) on any ChannelConnection instance created
-	private HashSet<SocketConnection> closedConnections = new HashSet<>();
+	private Collection<SocketConnection> closedConnections = new ConcurrentLinkedQueue<>();
 
 
 	/**
@@ -50,9 +51,7 @@ public abstract class ConnectionSelectorHandler extends SelectorHandler {
 	 * @param conn The connection that closed
 	 */
 	protected void onConnectionClosed(SocketConnection conn) {
-		synchronized(this.closedConnections){
-			this.closedConnections.add(conn);
-		}
+		this.closedConnections.add(conn);
 		super.selectorWakeup();
 	}
 
@@ -60,13 +59,11 @@ public abstract class ConnectionSelectorHandler extends SelectorHandler {
 	@Override
 	protected void loopIteration() throws IOException {
 		if(this.closedConnections.size() > 0){
-			synchronized(this.closedConnections){
-				Iterator<SocketConnection> closeIterator = this.closedConnections.iterator();
-				while(closeIterator.hasNext()){
-					logger.trace("Handling local close");
-					this.handleConnectionClosed(closeIterator.next());
-					closeIterator.remove();
-				}
+			Iterator<SocketConnection> closeIterator = this.closedConnections.iterator();
+			while(closeIterator.hasNext()){
+				logger.trace("Handling local close");
+				this.handleConnectionClosed(closeIterator.next());
+				closeIterator.remove();
 			}
 		}
 	}
