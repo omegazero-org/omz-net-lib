@@ -54,13 +54,12 @@ public class PlainConnection extends ChannelConnection {
 						return a;
 					}else
 						return null;
-				}
+				}else
+					super.close();
 			}
 		}catch(Exception e){
 			super.handleError(e);
 		}
-		// error or read returned below 0 (eof)
-		super.close();
 		return null;
 	}
 
