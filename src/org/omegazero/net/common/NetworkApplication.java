@@ -48,6 +48,7 @@ public interface NetworkApplication extends Runnable {
 	 * This method is equivalent to {@link #start()}, except that any <code>IOException</code>s thrown are wrapped into a <code>RuntimeException</code>. An application using
 	 * this instance may want to use {@link #start()} instead, to properly handle errors.
 	 */
+	@Override
 	default void run() {
 		try{
 			this.start();
