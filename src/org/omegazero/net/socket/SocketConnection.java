@@ -16,16 +16,19 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
 
+import org.omegazero.net.common.ThrowingConsumer;
+import org.omegazero.net.common.ThrowingRunnable;
+
 /**
  * Represents any type of connection between the local and a remote host.
  */
 public abstract class SocketConnection {
 
-	private Runnable onConnect;
-	private Runnable onTimeout;
-	private Consumer<byte[]> onData;
-	private Runnable onWritable;
-	private Runnable onClose;
+	private ThrowingRunnable onConnect;
+	private ThrowingRunnable onTimeout;
+	private ThrowingConsumer<byte[]> onData;
+	private ThrowingRunnable onWritable;
+	private ThrowingRunnable onClose;
 	private Consumer<Throwable> onError;
 	private Consumer<SocketConnection> onLocalConnect;
 	private Consumer<SocketConnection> onLocalClose;
@@ -212,7 +215,7 @@ public abstract class SocketConnection {
 	 * 
 	 * @param onConnect The callback
 	 */
-	public final void setOnConnect(Runnable onConnect) {
+	public final void setOnConnect(ThrowingRunnable onConnect) {
 		this.onConnect = onConnect;
 	}
 
@@ -221,7 +224,7 @@ public abstract class SocketConnection {
 	 * 
 	 * @param onTimeout The callback
 	 */
-	public final void setOnTimeout(Runnable onTimeout) {
+	public final void setOnTimeout(ThrowingRunnable onTimeout) {
 		this.onTimeout = onTimeout;
 	}
 
@@ -230,7 +233,7 @@ public abstract class SocketConnection {
 	 * 
 	 * @param onData The callback
 	 */
-	public final void setOnData(Consumer<byte[]> onData) {
+	public final void setOnData(ThrowingConsumer<byte[]> onData) {
 		this.onData = onData;
 	}
 
@@ -239,7 +242,7 @@ public abstract class SocketConnection {
 	 * 
 	 * @param onWritable The callback
 	 */
-	public final void setOnWritable(Runnable onWritable) {
+	public final void setOnWritable(ThrowingRunnable onWritable) {
 		this.onWritable = onWritable;
 	}
 
@@ -248,7 +251,7 @@ public abstract class SocketConnection {
 	 * 
 	 * @param onClose The callback
 	 */
-	public final void setOnClose(Runnable onClose) {
+	public final void setOnClose(ThrowingRunnable onClose) {
 		this.onClose = onClose;
 	}
 
