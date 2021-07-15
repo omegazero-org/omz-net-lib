@@ -43,6 +43,7 @@ public abstract class ChannelConnection extends SocketConnection {
 
 	private Deque<byte[]> writeBacklog = new LinkedList<>();
 	private ByteBuffer writeBufTemp;
+	private boolean pendingClose = false;
 
 	public ChannelConnection(SelectionKey selectionKey, ChannelProvider provider) throws IOException {
 		this(selectionKey, provider, null);
@@ -80,6 +81,15 @@ public abstract class ChannelConnection extends SocketConnection {
 
 	protected abstract void createBuffers();
 
+	protected void close0() {
+		super.localClose();
+		try{
+			this.provider.close();
+		}catch(IOException e){
+			throw new RuntimeException("Error while closing channel", e);
+		}
+	}
+
 
 	@Override
 	public void connect(int timeout) {
@@ -95,12 +105,12 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 	@Override
-	public void close() {
-		super.localClose();
-		try{
-			this.provider.close();
-		}catch(IOException e){
-			throw new RuntimeException("Error while closing channel", e);
+	public final void close() {
+		synchronized(this.writeBuf){
+			if(!this.isWritable()) // data still pending in write backlog
+				this.pendingClose = true;
+			else
+				this.close0();
 		}
 	}
 
@@ -204,6 +214,10 @@ public abstract class ChannelConnection extends SocketConnection {
 			if(!this.writeBufTemp.hasRemaining()){
 				this.provider.writeBacklogEnded();
 				super.handleWritable();
+				if(this.pendingClose){
+					this.pendingClose = false;
+					this.close0();
+				}
 				return true;
 			}else{
 				return false;

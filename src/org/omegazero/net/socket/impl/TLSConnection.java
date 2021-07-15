@@ -199,22 +199,9 @@ public class TLSConnection extends ChannelConnection {
 	}
 
 	@Override
-	public void close() {
-		this.sslEngine.closeOutbound();
-		if(super.isConnected()){
-			synchronized(super.writeBuf){
-				try{
-					super.writeBuf.clear();
-					SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
-					super.writeBuf.flip();
-					int written = super.writeToSocket();
-					logger.debug("Wrote SSL close message (", written, " bytes, status ", result.getStatus(), ")");
-				}catch(IOException e){
-					logger.debug("Error while writing SSL close message: ", e.toString());
-				}
-			}
-		}
-		super.close();
+	protected void close0() {
+		this.closeOutbound();
+		super.close0();
 	}
 
 	/**
@@ -240,14 +227,31 @@ public class TLSConnection extends ChannelConnection {
 	}
 
 
+	private void closeOutbound() {
+		this.sslEngine.closeOutbound();
+		if(super.isConnected()){
+			synchronized(super.writeBuf){
+				try{
+					super.writeBuf.clear();
+					SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
+					super.writeBuf.flip();
+					int written = super.writeToSocket();
+					logger.debug("Wrote SSL close message (", written, " bytes, status ", result.getStatus(), ")");
+				}catch(IOException e){
+					logger.debug("Error while writing SSL close message: ", e.toString());
+				}
+			}
+		}
+	}
+
 	private byte[] readApplicationData() throws IOException {
 		this.readBufUnwrapped.clear();
 		while(super.readBuf.hasRemaining()){
 			int beforeDataLen = super.readBuf.remaining();
 			SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
 			if(result.getStatus() == Status.CLOSED){
-				this.close();
-				return null;
+				this.closeOutbound();
+				break;
 			}else if(result.getStatus() == Status.OK){
 				if(super.readBuf.remaining() >= beforeDataLen)
 					throw new IOException("unwrap returned OK but no data was read");
