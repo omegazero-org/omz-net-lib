@@ -114,6 +114,11 @@ public abstract class ChannelConnection extends SocketConnection {
 		}
 	}
 
+	@Override
+	public final void destroy() {
+		this.close0();
+	}
+
 	/**
 	 * 
 	 * @return <code>true</code> if this socket is open and available for reading or writing
@@ -182,6 +187,7 @@ public abstract class ChannelConnection extends SocketConnection {
 				this.writeBufTemp = ByteBuffer.allocate(this.writeBuf.capacity());
 				this.writeBufTemp.flip(); // set to no remaining bytes
 			}
+
 			boolean already = this.writeBacklog.size() > 0 || this.writeBufTemp.hasRemaining();
 			byte[] wb = new byte[this.writeBuf.remaining()];
 			this.writeBuf.get(wb);
@@ -235,7 +241,7 @@ public abstract class ChannelConnection extends SocketConnection {
 		synchronized(this.writeBuf){
 			long start = System.currentTimeMillis();
 			this.lastIOTime = start;
-			if(this.writeBacklog.size() > 0 || (this.writeBufTemp != null && this.writeBufTemp.hasRemaining())){
+			if(!this.isWritable()){
 				// there is still data in the write backlog, so dont even attempt to write to socket because it is full
 				return this.addToWriteBacklog();
 			}

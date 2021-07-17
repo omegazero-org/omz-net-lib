@@ -78,9 +78,16 @@ public abstract class SocketConnection {
 	public abstract void write(byte[] data);
 
 	/**
-	 * Closes this connection.
+	 * Closes this connection after all remaining data has been flushed to the socket, which may not be immediately.
 	 */
 	public abstract void close();
+
+	/**
+	 * Similar to {@link #close()}, except that the connection is closed immediately, without waiting for data to be flushed to the socket.<br>
+	 * <br>
+	 * {@link #isConnected()} should return <code>false</code> immediately after calling this method.
+	 */
+	public abstract void destroy();
 
 	/**
 	 * 
@@ -192,7 +199,7 @@ public abstract class SocketConnection {
 	public final void handleError(Throwable e) {
 		if(this.onError != null){
 			this.onError.accept(e);
-			this.close();
+			this.destroy();
 		}else
 			throw new RuntimeException("Socket Error", e);
 	}
