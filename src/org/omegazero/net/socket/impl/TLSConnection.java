@@ -146,7 +146,7 @@ public class TLSConnection extends ChannelConnection {
 						super.readBuf.flip();
 						return this.readApplicationData();
 					}else if(read < 0){
-						this.close();
+						super.close0();
 					}
 				}else{
 					this.doTLSHandshake();
