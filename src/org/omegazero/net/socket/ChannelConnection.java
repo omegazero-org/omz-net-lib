@@ -107,7 +107,7 @@ public abstract class ChannelConnection extends SocketConnection {
 	@Override
 	public final void close() {
 		synchronized(this.writeBuf){
-			if(!this.isWritable()) // data still pending in write backlog
+			if(!this.isWriteBacklogEmpty()) // data still pending in write backlog
 				this.pendingClose = true;
 			else
 				this.close0();
@@ -145,7 +145,7 @@ public abstract class ChannelConnection extends SocketConnection {
 
 	@Override
 	public boolean isWritable() {
-		return this.isConnected() && this.writeBacklog.size() == 0 && (this.writeBufTemp == null || !this.writeBufTemp.hasRemaining());
+		return this.isConnected() && this.isWriteBacklogEmpty();
 	}
 
 	@Override
@@ -231,6 +231,10 @@ public abstract class ChannelConnection extends SocketConnection {
 		}
 	}
 
+	private boolean isWriteBacklogEmpty() {
+		return this.writeBacklog.size() == 0 && (this.writeBufTemp == null || !this.writeBufTemp.hasRemaining());
+	}
+
 
 	protected final int readFromSocket() throws IOException {
 		this.lastIOTime = System.currentTimeMillis();
@@ -241,7 +245,7 @@ public abstract class ChannelConnection extends SocketConnection {
 		synchronized(this.writeBuf){
 			long start = System.currentTimeMillis();
 			this.lastIOTime = start;
-			if(!this.isWritable()){
+			if(!this.isWriteBacklogEmpty()){
 				// there is still data in the write backlog, so dont even attempt to write to socket because it is full
 				return this.addToWriteBacklog();
 			}
