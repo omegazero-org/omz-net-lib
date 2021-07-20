@@ -154,9 +154,11 @@ public abstract class SocketConnection {
 
 	public final void handleConnect() {
 		try{
+			this.flushWriteQueue();
 			if(this.onConnect != null)
 				this.onConnect.run();
-			this.flushWriteQueue();
+			if(this.isWritable())
+				this.handleWritable();
 		}catch(Exception e){
 			this.handleError(e);
 		}
@@ -166,6 +168,7 @@ public abstract class SocketConnection {
 		try{
 			if(this.onTimeout != null)
 				this.onTimeout.run();
+			this.destroy();
 		}catch(Exception e){
 			this.handleError(e);
 		}
@@ -189,7 +192,9 @@ public abstract class SocketConnection {
 
 	public final void handleWritable() {
 		try{
-			if(this.onWritable != null)
+			// onWritable can happen before onConnect, for example when flushing the write backlog, but that should be suppressed
+			// this is called anyway in handleConnect if socket is writable
+			if(this.hasConnected() && this.onWritable != null)
 				this.onWritable.run();
 		}catch(Exception e){
 			this.handleError(e);
@@ -245,7 +250,7 @@ public abstract class SocketConnection {
 	}
 
 	/**
-	 * Sets a callback that is called when this socket is ready for writing again after a {@link #write(byte[])} operation.
+	 * Sets a callback that is called when this socket is ready for writing after a {@link #write(byte[])} or {@link #connect(int)} operation.
 	 * 
 	 * @param onWritable The callback
 	 */
@@ -325,7 +330,7 @@ public abstract class SocketConnection {
 
 
 	public final Object getAttachment() {
-		return attachment;
+		return this.attachment;
 	}
 
 	public final void setAttachment(Object attachment) {

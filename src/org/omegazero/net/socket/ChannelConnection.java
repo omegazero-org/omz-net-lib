@@ -145,7 +145,7 @@ public abstract class ChannelConnection extends SocketConnection {
 
 	@Override
 	public boolean isWritable() {
-		return this.writeBacklog.size() == 0 && (this.writeBufTemp == null || !this.writeBufTemp.hasRemaining());
+		return this.isConnected() && this.writeBacklog.size() == 0 && (this.writeBufTemp == null || !this.writeBufTemp.hasRemaining());
 	}
 
 	@Override
