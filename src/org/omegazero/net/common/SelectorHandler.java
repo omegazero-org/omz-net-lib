@@ -168,14 +168,9 @@ public abstract class SelectorHandler {
 					Iterator<SelectionKey> iterator = this.selector.selectedKeys().iterator();
 					while(iterator.hasNext()){
 						SelectionKey key = iterator.next();
-						// CancelledKeyException is likely caused by an extremely rare race condition when one thread is executing this handleSelectedKey handler
-						// while another thread called close() on the channel. The handler likely attempts to interact with the now canceled key and causes this exception
-						try{
-							this.handleSelectedKey(key);
-						}catch(java.nio.channels.CancelledKeyException e){
-							SelectableChannel channel = key.channel();
-							logger.warn("Caught CancelledKeyException on channel ", channel);
-							channel.close();
+						synchronized(key){
+							if(key.isValid())
+								this.handleSelectedKey(key);
 						}
 						iterator.remove();
 					}
