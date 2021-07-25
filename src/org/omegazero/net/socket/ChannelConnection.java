@@ -106,12 +106,10 @@ public abstract class ChannelConnection extends SocketConnection {
 
 	@Override
 	public final void close() {
-		synchronized(this.writeBuf){
-			if(!this.isWriteBacklogEmpty()) // data still pending in write backlog
-				this.pendingClose = true;
-			else
-				this.close0();
-		}
+		if(!this.isWriteBacklogEmpty()) // data still pending in write backlog
+			this.pendingClose = true;
+		else
+			this.close0();
 	}
 
 	@Override
@@ -232,7 +230,9 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 	private boolean isWriteBacklogEmpty() {
-		return this.writeBacklog.size() == 0 && (this.writeBufTemp == null || !this.writeBufTemp.hasRemaining());
+		synchronized(this.writeBuf){
+			return this.writeBacklog.size() == 0 && (this.writeBufTemp == null || !this.writeBufTemp.hasRemaining());
+		}
 	}
 
 
