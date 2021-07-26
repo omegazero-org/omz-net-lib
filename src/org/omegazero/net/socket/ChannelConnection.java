@@ -44,6 +44,7 @@ public abstract class ChannelConnection extends SocketConnection {
 	private Deque<byte[]> writeBacklog = new LinkedList<>();
 	private ByteBuffer writeBufTemp;
 	private boolean pendingClose = false;
+	private boolean closed = false;
 
 	public ChannelConnection(SelectionKey selectionKey, ChannelProvider provider) throws IOException {
 		this(selectionKey, provider, null);
@@ -82,6 +83,11 @@ public abstract class ChannelConnection extends SocketConnection {
 	protected abstract void createBuffers();
 
 	protected void close0() {
+		synchronized(this){
+			if(this.closed)
+				return;
+			this.closed = true;
+		}
 		super.localClose();
 		try{
 			this.provider.close();
