@@ -50,7 +50,7 @@ public class SocketChannelProvider implements ChannelProvider {
 				this.connectTimeout = Tasks.timeout((args) -> {
 					if(!SocketChannelProvider.this.connection.hasConnected()){
 						SocketChannelProvider.this.connection.handleTimeout();
-						SocketChannelProvider.this.connection.close();
+						SocketChannelProvider.this.connection.destroy();
 					}
 				}, timeout).daemon().getId();
 		}
