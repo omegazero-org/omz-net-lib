@@ -53,16 +53,14 @@ public abstract class ChannelConnection extends SocketConnection {
 	public ChannelConnection(SelectionKey selectionKey, ChannelProvider provider, SocketAddress remote) throws IOException {
 		this.provider = provider;
 
-		if(!(selectionKey.channel() instanceof SocketChannel || selectionKey.channel() instanceof DatagramChannel))
-			throw new IllegalArgumentException("The SelectionKey channel must be a SocketChannel or DatagramChannel");
-		this.socket = selectionKey.channel();
+		this.socket = selectionKey != null ? selectionKey.channel() : null;
 
 		provider.init(this, selectionKey);
 
 		SocketAddress socketRemote = null;
 		if(this.socket instanceof SocketChannel)
 			socketRemote = ((SocketChannel) this.socket).getRemoteAddress();
-		else if(remote == null)
+		else if(this.socket instanceof DatagramChannel && remote == null)
 			// if representing a client, remote must be given anyways and for incoming requests to a server, the socket will represent the server socket
 			// (which doesnt have a remote address, so it must be provided)
 			throw new IllegalArgumentException("remote address must always be given for DatagramChannels");
@@ -72,7 +70,10 @@ public abstract class ChannelConnection extends SocketConnection {
 			this.remoteAddress = socketRemote;
 		else
 			this.remoteAddress = remote;
-		this.localAddress = ((NetworkChannel) this.socket).getLocalAddress();
+		if(this.socket instanceof NetworkChannel)
+			this.localAddress = ((NetworkChannel) this.socket).getLocalAddress();
+		else
+			this.localAddress = null;
 
 		this.lastIOTime = System.currentTimeMillis();
 
@@ -129,7 +130,7 @@ public abstract class ChannelConnection extends SocketConnection {
 	 */
 	@Override
 	public boolean isConnected() {
-		return this.provider.isAvailable() && this.socket.isOpen();
+		return this.provider.isAvailable() && (this.socket == null || this.socket.isOpen());
 	}
 
 	@Override
@@ -179,7 +180,7 @@ public abstract class ChannelConnection extends SocketConnection {
 
 
 	private void ensureNonBlocking() throws IOException {
-		if(this.socket.isBlocking())
+		if(this.socket != null && this.socket.isBlocking())
 			this.socket.configureBlocking(false);
 	}
 
