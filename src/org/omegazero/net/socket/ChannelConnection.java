@@ -23,6 +23,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Deque;
 import java.util.LinkedList;
 
+import org.omegazero.net.common.ThrowingRunnable;
 import org.omegazero.net.socket.provider.ChannelProvider;
 
 /**
@@ -112,8 +113,13 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 	@Override
+	public boolean flush() {
+		return this.flushWriteBacklog();
+	}
+
+	@Override
 	public final void close() {
-		if(!this.isWriteBacklogEmpty()) // data still pending in write backlog
+		if(!this.closed && !this.flush()) // data still pending
 			this.pendingClose = true;
 		else
 			this.close0();
@@ -165,7 +171,9 @@ public abstract class ChannelConnection extends SocketConnection {
 
 
 	/**
-	 * Attempts to write any remaining data in the write buffer and write backlog to the socket and returns <code>true</code> if all data could be written.
+	 * Attempts to write any remaining data in the write buffer and write backlog to the socket and returns <code>true</code> if all data could be written.<br>
+	 * <br>
+	 * This method is equivalent to {@link #flush()}.
 	 * 
 	 * @return <code>true</code> if all pending data was written to the socket
 	 */
@@ -269,6 +277,40 @@ public abstract class ChannelConnection extends SocketConnection {
 			if(this.isWritable())
 				super.handleWritable();
 			return written;
+		}
+	}
+
+
+	protected final void writeBuffered(byte[] data, boolean flush, ByteBuffer targetBuffer, ThrowingRunnable writeOut) {
+		try{
+			synchronized(this){
+				if(!super.hasConnected()){
+					if(data != null && data.length > 0)
+						super.queueWrite(data);
+					return;
+				}
+			}
+			synchronized(this.writeBuf){
+				if(!flush && targetBuffer.remaining() >= data.length){
+					targetBuffer.put(data);
+				}else if(data != null && data.length > 0){
+					int written = 0;
+					while(written < data.length){
+						int wr = Math.min(targetBuffer.remaining(), data.length - written);
+						targetBuffer.put(data, written, wr);
+						targetBuffer.flip();
+						writeOut.run();
+						targetBuffer.clear();
+						written += wr;
+					}
+				}else if(targetBuffer.position() > 0){
+					targetBuffer.flip();
+					writeOut.run();
+					targetBuffer.clear();
+				}
+			}
+		}catch(Exception e){
+			super.handleError(e);
 		}
 	}
 }

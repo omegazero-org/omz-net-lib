@@ -65,27 +65,17 @@ public class PlainConnection extends ChannelConnection {
 
 	@Override
 	public void write(byte[] data) {
-		try{
-			synchronized(this){
-				if(!super.hasConnected()){
-					super.queueWrite(data);
-					return;
-				}
-			}
-			synchronized(super.writeBuf){
-				super.writeBuf.clear();
-				int written = 0;
-				while(written < data.length){
-					int wr = Math.min(super.writeBuf.remaining(), data.length - written);
-					super.writeBuf.put(data, written, wr);
-					super.writeBuf.flip();
-					super.writeToSocket();
-					super.writeBuf.compact();
-					written += wr;
-				}
-			}
-		}catch(Throwable e){
-			super.handleError(e);
-		}
+		super.writeBuffered(data, true, super.writeBuf, super::writeToSocket);
+	}
+
+	@Override
+	public void writeQueue(byte[] data) {
+		super.writeBuffered(data, false, super.writeBuf, super::writeToSocket);
+	}
+
+	@Override
+	public boolean flush() {
+		super.writeBuffered(null, true, super.writeBuf, super::writeToSocket);
+		return super.flush();
 	}
 }

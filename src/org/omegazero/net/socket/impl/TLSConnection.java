@@ -164,37 +164,29 @@ public class TLSConnection extends ChannelConnection {
 
 	@Override
 	public void write(byte[] data) {
-		try{
-			synchronized(this){
-				if(!super.hasConnected()){
-					super.queueWrite(data);
-					return;
-				}
-			}
-			synchronized(super.writeBuf){
-				this.writeBufUnwrapped.clear();
-				int written = 0;
-				while(written < data.length){
-					int wr = Math.min(this.writeBufUnwrapped.remaining(), data.length - written);
-					this.writeBufUnwrapped.put(data, written, wr);
-					this.writeBufUnwrapped.flip();
+		super.writeBuffered(data, true, this.writeBufUnwrapped, this::writeWrapped);
+	}
 
-					while(this.writeBufUnwrapped.hasRemaining()){
-						super.writeBuf.clear();
-						SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
-						if(result.getStatus() == Status.OK){
-							super.writeBuf.flip();
-							super.writeToSocket();
-						}else
-							throw new SSLException("Write SSL wrap failed: " + result.getStatus());
-					}
+	@Override
+	public void writeQueue(byte[] data) {
+		super.writeBuffered(data, false, this.writeBufUnwrapped, this::writeWrapped);
+	}
 
-					this.writeBufUnwrapped.compact();
-					written += wr;
-				}
-			}
-		}catch(Exception e){
-			super.handleError(e);
+	@Override
+	public boolean flush() {
+		super.writeBuffered(null, true, this.writeBufUnwrapped, this::writeWrapped);
+		return super.flush();
+	}
+
+	private void writeWrapped() throws IOException {
+		while(this.writeBufUnwrapped.hasRemaining()){
+			super.writeBuf.clear();
+			SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
+			if(result.getStatus() == Status.OK){
+				super.writeBuf.flip();
+				super.writeToSocket();
+			}else
+				throw new SSLException("Write SSL wrap failed: " + result.getStatus());
 		}
 	}
 

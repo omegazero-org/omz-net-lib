@@ -66,7 +66,7 @@ public abstract class SocketConnection {
 	public abstract byte[] read();
 
 	/**
-	 * Writes data to this connection for delivery to the peer host. <br>
+	 * Writes data to this connection for delivery to the peer host.<br>
 	 * <br>
 	 * This function is non-blocking and may store data in a temporary write buffer if the underlying socket is busy. An application should try to respect the value of
 	 * {@link #isWritable()} to reduce memory consumption by such write buffer if a lot of data is being written.<br>
@@ -74,8 +74,30 @@ public abstract class SocketConnection {
 	 * If this method is called before the <code>onConnect</code> event, the data is queued in a temporary buffer and written out when the socket connects.
 	 * 
 	 * @param data The data to be written to this connection
+	 * @see #writeQueue(byte[])
 	 */
 	public abstract void write(byte[] data);
+
+	/**
+	 * Similar to {@link #write(byte[])}, except that no attempt will be made to immediately flush the data to the socket, if supported by the implementation.<br>
+	 * <br>
+	 * The default behavior is to call {@link #write(byte[])}. Subclasses should override this method.
+	 * 
+	 * @param data The data
+	 * @see #write(byte[])
+	 */
+	public void writeQueue(byte[] data) {
+		this.write(data);
+	}
+
+	/**
+	 * Attempts to flush any queued data after a call to {@link #writeQueue(byte[])} or data that could not be written previously because the socket was busy.
+	 * 
+	 * @return <code>true</code> if all data could be written to the socket
+	 * @see #write(byte[])
+	 * @see #writeQueue(byte[])
+	 */
+	public abstract boolean flush();
 
 	/**
 	 * Closes this connection after all remaining data has been flushed to the socket, which may not be immediately.
