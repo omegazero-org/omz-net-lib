@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import org.omegazero.common.event.Tasks;
@@ -55,7 +56,7 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 	private long idleTimeout;
 
 	// only required for idle timeouts
-	private final List<ChannelConnection> connections = new java.util.LinkedList<>();
+	private final Set<ChannelConnection> connections = new java.util.HashSet<>();
 
 	/**
 	 * 
