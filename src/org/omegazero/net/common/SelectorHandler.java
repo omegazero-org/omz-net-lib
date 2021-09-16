@@ -122,17 +122,21 @@ public abstract class SelectorHandler {
 			Selector newSelector = Selector.open();
 			Set<SelectionKey> keys = this.selectorKeys();
 			for(SelectionKey key : keys){
-				SelectableChannel channel = key.channel();
-				Object att = key.attachment();
-				int ops = key.interestOps();
-				key.cancel();
-				channel.register(newSelector, ops, att);
+				synchronized(key){
+					if(!key.isValid())
+						continue;
+					SelectableChannel channel = key.channel();
+					Object att = key.attachment();
+					int ops = key.interestOps();
+					key.cancel();
+					channel.register(newSelector, ops, att);
+				}
 			}
 			this.selector.close();
 
 			this.selector = newSelector;
 		}catch(IOException e){
-			logger.warn("Error while rebuilding selector: ", e);
+			logger.error("Error while rebuilding selector: ", e);
 		}
 	}
 
@@ -175,7 +179,9 @@ public abstract class SelectorHandler {
 						iterator.remove();
 					}
 				}
+				// reset these because everything seems fine
 				selectorSpins = 0;
+				selectorRebuilds = 0;
 			}else
 				selectorSpins++;
 			if(this.registerOperation){
@@ -198,6 +204,6 @@ public abstract class SelectorHandler {
 
 
 	public boolean isRunning() {
-		return running;
+		return this.running;
 	}
 }
