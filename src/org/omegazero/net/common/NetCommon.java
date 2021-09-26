@@ -11,14 +11,48 @@
  */
 package org.omegazero.net.common;
 
+import org.omegazero.common.logging.LogLevel;
+import org.omegazero.common.logging.Logger;
 import org.omegazero.common.util.PropertyUtil;
+import org.omegazero.net.socket.SocketConnection;
 
 public final class NetCommon {
 
-	private static final boolean printStackTraces = PropertyUtil.getBoolean("org.omegazero.net.printStackTraces", false);
+	/**
+	 * The version string of <i>omz-net-lib</i>.
+	 */
+	public static final String VERSION = "1.3";
+
+	/**
+	 * System property <code>org.omegazero.net.printStackTraces</code><br>
+	 * <br>
+	 * Whether the full stack trace of a socket error should be printed instead of just the error message.<br>
+	 * <br>
+	 * <b>Default:</b> <code>false</code>
+	 */
+	public static final boolean PRINT_STACK_TRACES = PropertyUtil.getBoolean("org.omegazero.net.printStackTraces", false);
+
+	/**
+	 * System property <code>org.omegazero.net.socketErrorDebug</code><br>
+	 * <br>
+	 * Whether the default socket error handler should print socket error messages with log level <i>DEBUG</i> instead of <i>WARN</i>. This may be used to reduce log noise on
+	 * public-facing servers where there may be many misbehaving clients connecting to it.<br>
+	 * <br>
+	 * <b>Default:</b> <code>false</code>
+	 */
+	public static final boolean SOCKET_ERROR_DEBUG = PropertyUtil.getBoolean("org.omegazero.net.socketErrorDebug", false);
 
 
+	/**
+	 * @deprecated Access {@link NetCommon#PRINT_STACK_TRACES} directly instead
+	 */
+	@Deprecated
 	public static boolean isPrintStackTraces() {
-		return printStackTraces;
+		return PRINT_STACK_TRACES;
+	}
+
+	public static void logSocketError(Logger logger, String msg, SocketConnection conn, Throwable e) {
+		logger.log(SOCKET_ERROR_DEBUG ? LogLevel.DEBUG : LogLevel.WARN,
+				new Object[] { msg, " (remote address=", conn.getRemoteAddress(), "): ", PRINT_STACK_TRACES ? e : e.toString() });
 	}
 }

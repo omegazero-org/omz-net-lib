@@ -56,7 +56,7 @@ public class PlainUDPServer extends UDPServer {
 
 		conn.setOnError((e) -> {
 			if(e instanceof IOException)
-				logger.warn("UDP Socket Error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
+				NetCommon.logSocketError(logger, "UDP Socket Error", conn, e);
 			else
 				logger.error("Error in UDP connection (remote address=", conn.getRemoteAddress(), "): ", e);
 		});

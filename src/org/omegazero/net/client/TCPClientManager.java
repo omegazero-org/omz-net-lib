@@ -98,7 +98,7 @@ public abstract class TCPClientManager extends ConnectionSelectorHandler impleme
 		conn.setOnLocalClose(super::onConnectionClosed);
 
 		conn.setOnError((e) -> {
-			logger.warn("Socket Error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
+			NetCommon.logSocketError(logger, "Socket Error", conn, e);
 		});
 
 		if(params.getLocal() != null)

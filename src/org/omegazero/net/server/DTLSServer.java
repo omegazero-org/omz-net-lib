@@ -80,7 +80,7 @@ public class DTLSServer extends UDPServer {
 	 * @return The list of configured supported application layer protocol names, or <code>null</code> of none were configured
 	 */
 	public String[] getSupportedApplicationLayerProtocols() {
-		return supportedApplicationLayerProtocols;
+		return this.supportedApplicationLayerProtocols;
 	}
 
 
@@ -90,13 +90,12 @@ public class DTLSServer extends UDPServer {
 				this.supportedApplicationLayerProtocols, null);
 
 		conn.setOnError((e) -> {
-			// see notes in TLSServer
 			if(e instanceof SSLHandshakeException)
-				logger.warn("TLS handshake failed (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
+				NetCommon.logSocketError(logger, "TLS handshake failed", conn, e);
 			else if(e instanceof SSLException)
-				logger.warn("TLS error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
+				NetCommon.logSocketError(logger, "TLS error", conn, e);
 			else if(e instanceof IOException)
-				logger.warn("Socket Error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
+				NetCommon.logSocketError(logger, "Socket error", conn, e);
 			else
 				logger.error("Error in connection (remote address=", conn.getRemoteAddress(), "): ", e);
 		});

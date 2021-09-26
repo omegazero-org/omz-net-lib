@@ -78,7 +78,7 @@ public class TLSServer extends TCPServer {
 	 * @return The list of configured supported application layer protocol names, or <code>null</code> of none were configured
 	 */
 	public String[] getSupportedApplicationLayerProtocols() {
-		return supportedApplicationLayerProtocols;
+		return this.supportedApplicationLayerProtocols;
 	}
 
 
@@ -88,14 +88,12 @@ public class TLSServer extends TCPServer {
 
 		// see note in PlainTCPServer
 		conn.setOnError((e) -> {
-			// if it is a SSLHandshakeException, no need to be verbose because it isn't a fatal error (may just be caused because a client
-			// is bad or doesn't accept a certificate)
 			if(e instanceof SSLHandshakeException)
-				logger.warn("TLS handshake failed (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
-			else if(e instanceof SSLException) // same applies to SSLException, for example when a client sends a malformed SSL packet, a SSLException is thrown
-				logger.warn("TLS error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
+				NetCommon.logSocketError(logger, "TLS handshake failed", conn, e);
+			else if(e instanceof SSLException)
+				NetCommon.logSocketError(logger, "TLS error", conn, e);
 			else if(e instanceof IOException)
-				logger.warn("Socket Error (remote address=", conn.getRemoteAddress(), "): ", NetCommon.isPrintStackTraces() ? e : e.toString());
+				NetCommon.logSocketError(logger, "Socket error", conn, e);
 			else
 				logger.error("Error in connection (remote address=", conn.getRemoteAddress(), "): ", e);
 		});
