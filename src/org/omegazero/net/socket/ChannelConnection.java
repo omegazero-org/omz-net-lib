@@ -213,9 +213,9 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 	private boolean flushWriteBacklog0() throws IOException {
-		if(this.writeBufTemp == null) // writeBufTemp not even created, so never used write backlog
-			return true;
 		synchronized(this.writeBuf){ // sync with writeBuf (not temp) to prevent concurrent write attempts in writeToSocket
+			if(this.isWriteBacklogEmpty())
+				return true;
 			if(this.writeBufTemp.hasRemaining()){
 				this.provider.write(this.writeBufTemp);
 				if(this.writeBufTemp.hasRemaining()) // the socket still was not able to write the whole content
@@ -274,8 +274,6 @@ public abstract class ChannelConnection extends SocketConnection {
 				}
 				written += w;
 			}
-			if(this.isWritable())
-				super.handleWritable();
 			return written;
 		}
 	}

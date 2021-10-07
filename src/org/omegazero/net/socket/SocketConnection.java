@@ -272,7 +272,9 @@ public abstract class SocketConnection {
 	}
 
 	/**
-	 * Sets a callback that is called when this socket is ready for writing after a {@link #write(byte[])} or {@link #connect(int)} operation.
+	 * Sets a callback that is called when this socket is ready for writing after a {@link #write(byte[])} or {@link #connect(int)} operation. This event is not called if the
+	 * socket was previously already writable. This event is also not called during a <code>write(byte[])</code> call to allow the handler to safely call that method without
+	 * being called again synchronously.
 	 * 
 	 * @param onWritable The callback
 	 */
