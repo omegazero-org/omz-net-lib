@@ -224,11 +224,19 @@ public class TLSConnection extends ChannelConnection {
 		if(super.isConnected()){
 			synchronized(super.writeBuf){
 				try{
-					super.writeBuf.clear();
-					SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
-					super.writeBuf.flip();
-					int written = super.writeToSocket();
-					logger.debug("Wrote SSL close message (", written, " bytes, status ", result.getStatus(), ")");
+					int count = 0;
+					SSLEngineResult result;
+					do{
+						super.writeBuf.clear();
+						result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
+						super.writeBuf.flip();
+						int written = super.writeToSocket();
+						logger.debug("Wrote SSL close message (", written, " bytes, status ", result.getStatus(), ")");
+						if(count++ >= 15){
+							logger.warn("Wrote ", count, " SSL close messages to ", this.getRemoteAddress(), ", aborting");
+							break;
+						}
+					}while(result.getStatus() == Status.OK);
 				}catch(IOException e){
 					logger.debug("Error while writing SSL close message: ", e.toString());
 				}
