@@ -230,18 +230,17 @@ public abstract class ChannelConnection extends SocketConnection {
 				if(this.writeBufTemp.hasRemaining()) // could not write entire data packet to socket
 					break;
 			}
-			if(!this.writeBufTemp.hasRemaining()){
-				this.provider.writeBacklogEnded();
-				super.handleWritable();
-				if(this.pendingClose){
-					this.pendingClose = false;
-					this.close0();
-				}
-				return true;
-			}else{
+			if(this.writeBufTemp.hasRemaining())
 				return false;
-			}
+			this.provider.writeBacklogEnded();
 		}
+		// no need to lock writeBuf here anymore
+		super.handleWritable();
+		if(this.pendingClose){
+			this.pendingClose = false;
+			this.close0();
+		}
+		return true;
 	}
 
 	private boolean isWriteBacklogEmpty() {
