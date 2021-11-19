@@ -218,9 +218,9 @@ public abstract class SelectorHandler {
 			}else
 				selectorSpins++;
 			if(this.registerOperation){
-				long start = System.currentTimeMillis();
+				long start = System.nanoTime();
 				while(this.registerOperation){
-					if(System.currentTimeMillis() - start > 1000)
+					if(System.nanoTime() - start > 2000_000_000L)
 						throw new RuntimeException("Waiting time for register operation exceeded");
 				}
 			}
