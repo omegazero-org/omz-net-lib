@@ -22,6 +22,21 @@ import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.common.util.PropertyUtil;
 
+/**
+ * Wraps a java.nio {@link Selector}.<br>
+ * <br>
+ * A thread must call {@link #initSelector()} followed by {@link #runSelectorLoop()} to start selecting keys, which can then be handled in the abstract method
+ * {@link #handleSelectedKey(SelectionKey)}. Additional keys may be added safely while running using {@link #registerChannel(SelectableChannel, int, Object)}.<br>
+ * <br>
+ * This class defines the following system properties:
+ * <ul>
+ * <li><code>org.omegazero.net.nioselector.rebuildThreshold</code> (integer, default 1024) - The maximum number of times the {@linkplain Selector#select() selection operation}
+ * may return in a row without having any keys selected. If this threshold is exceeded, the selector will be rebuilt. This feature exists to mitigate the selector/epoll
+ * immediate return bug, which may exist on older JVM distributions</li>
+ * <li><code>org.omegazero.net.nioselector.maxRebuilds</code> (integer, default 8) - The maximum number of times the selector may be rebuilt in a row (see above). If this
+ * threshold is exceeded, the {@linkplain #runSelectorLoop() selector loop} will exit with an <code>IOException</code></li>
+ * </ul>
+ */
 public abstract class SelectorHandler {
 
 	private static final Logger logger = LoggerUtil.createLogger();
@@ -38,12 +53,23 @@ public abstract class SelectorHandler {
 
 
 	/**
-	 * Called when a key was selected in a select call in the {@link SelectorHandler#selectorLoop()} method.
+	 * Called when a key was selected in a {@linkplain Selector#select() select call} in the {@link #runSelectorLoop()} method.
 	 * 
 	 * @param key The selected key
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs
 	 */
 	protected abstract void handleSelectedKey(SelectionKey key) throws IOException;
+
+	/**
+	 * Called every loop iteration in {@link #runSelectorLoop()}, which is every time {@link Selector#select()} returns, either because a {@link SelectionKey} was selected or
+	 * the selector was woken up for any other reason (for example after a call to {@link #selectorWakeup()}).<br>
+	 * <br>
+	 * This method does nothing by default. Subclasses may override this method to perform additional required operations.
+	 * 
+	 * @throws IOException If an IO error occurs
+	 */
+	protected void loopIteration() throws IOException {
+	}
 
 
 	/**
@@ -106,6 +132,7 @@ public abstract class SelectorHandler {
 	 * @param attachment The attachment for the resulting key
 	 * @return The resulting {@link SelectionKey}
 	 * @throws IOException
+	 * @see #registerChannel(SelectableChannel, int)
 	 * @see SelectableChannel#register(Selector, int, Object)
 	 */
 	protected synchronized SelectionKey registerChannel(SelectableChannel channel, int ops, Object attachment) throws IOException {
@@ -141,24 +168,30 @@ public abstract class SelectorHandler {
 	}
 
 
+	/**
+	 * Wakes up the selector, causing a {@linkplain #loopIteration() selection loop iteration}.
+	 * 
+	 * @see Selector#wakeup()
+	 */
 	protected void selectorWakeup() {
 		this.selector.wakeup();
 	}
 
+	/**
+	 * 
+	 * @return The set of registered {@link SelectionKey}s. See {@link Selector#keys()}
+	 */
 	protected Set<SelectionKey> selectorKeys() {
 		return this.selector.keys();
 	}
 
 
-	protected void loopIteration() throws IOException {
-	}
-
 	/**
 	 * Runs the loop that continuously selects channels using the {@link Selector}.<br>
 	 * <br>
-	 * Will not return until {@link SelectorHandler#closeSelector()} is called. If {@link SelectorHandler#initSelector()} was never called, this method returns immediately.
+	 * Will not return until {@link #closeSelector()} is called. If {@link #initSelector()} was never called, this method returns immediately.
 	 * 
-	 * @throws IOException
+	 * @throws IOException If an IO error occurs, or if {@link #handleSelectedKey(SelectionKey)} or {@link #loopIteration()} throw an <code>IOException</code>
 	 */
 	protected void runSelectorLoop() throws IOException {
 		int selectorSpins = 0;
@@ -203,6 +236,11 @@ public abstract class SelectorHandler {
 	}
 
 
+	/**
+	 * 
+	 * @return <code>true</code> when this <code>SelectorHandler</code> is running; this is the case in the time between calls to {@link #initSelector()} and
+	 *         {@link #closeSelector()}
+	 */
 	public boolean isRunning() {
 		return this.running;
 	}
