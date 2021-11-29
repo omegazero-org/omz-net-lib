@@ -276,13 +276,14 @@ public class TLSConnection extends ChannelConnection {
 	public void doTLSHandshake() throws IOException {
 		if(this.handshakeComplete)
 			throw new IllegalStateException("Handshake is already completed");
-		HandshakeStatus status = sslEngine.getHandshakeStatus();
+		HandshakeStatus status = this.sslEngine.getHandshakeStatus();
 		if(status == HandshakeStatus.NOT_HANDSHAKING){
-			sslEngine.beginHandshake();
-			status = sslEngine.getHandshakeStatus();
+			this.sslEngine.beginHandshake();
+			status = this.sslEngine.getHandshakeStatus();
 		}
 		while(true){
-			if(status == HandshakeStatus.NEED_UNWRAP || status.toString().equals("NEED_UNWRAP_AGAIN") /* for java < 9 */){
+			boolean statusNUA = status.name().equals("NEED_UNWRAP_AGAIN") /* for java < 9 compatibility */;
+			if(status == HandshakeStatus.NEED_UNWRAP || statusNUA){
 				int read = super.readFromSocket();
 				if(read < 0)
 					throw new EOFException("Socket disconnected before handshake completed");
@@ -296,9 +297,9 @@ public class TLSConnection extends ChannelConnection {
 					return;
 				else if(result.getStatus() != Status.OK)
 					throw new SSLHandshakeException("Unexpected status after SSL unwrap: " + result.getStatus());
-				else if(super.readBuf.remaining() <= beforeRemaining)
+				else if(super.readBuf.remaining() <= beforeRemaining && !statusNUA) // no data is read from readBuf at NEED_UNWRAP_AGAIN
 					throw new IOException("unwrap returned OK but no data was read");
-				status = sslEngine.getHandshakeStatus();
+				status = this.sslEngine.getHandshakeStatus();
 			}else if(status == HandshakeStatus.NEED_WRAP){
 				super.writeBuf.clear();
 				SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
@@ -307,7 +308,7 @@ public class TLSConnection extends ChannelConnection {
 					super.writeToSocket();
 				}else
 					throw new SSLHandshakeException("Unexpected status after SSL wrap: " + result.getStatus());
-				status = sslEngine.getHandshakeStatus();
+				status = this.sslEngine.getHandshakeStatus();
 			}else if(status == HandshakeStatus.NEED_TASK){
 				Runnable r;
 				while((r = this.sslEngine.getDelegatedTask()) != null){
@@ -315,7 +316,7 @@ public class TLSConnection extends ChannelConnection {
 					// task to be completed. In that case, this thread might as well just run the task itself
 					r.run();
 				}
-				status = sslEngine.getHandshakeStatus();
+				status = this.sslEngine.getHandshakeStatus();
 			}else if(status == HandshakeStatus.NOT_HANDSHAKING){
 				this.handshakeComplete = true;
 				this.alpnProtocol = this.sslEngine.getApplicationProtocol();
