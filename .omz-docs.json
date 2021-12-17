@@ -1,0 +1,23 @@
+{
+	"generator": "javadoc",
+	"targetName": "omz-net-lib",
+	"generatorOptions": {
+		"src": ["src"],
+		"packages": ["org"],
+		"windowtitle": "omegazero Java Network Library",
+		"doctitle": "omegazero Java Network Library documentation",
+		"header": "omz net lib",
+		"groups": {
+			"Networking Packages": "org.omegazero.net.*"
+		},
+		"links": [
+			"https://docs.oracle.com/javase/8/docs/api/",
+			"https://stleary.github.io/JSON-java/",
+			"https://docs.omegazero.org/javadoc/omz-java-lib/"
+		],
+		"dependencies": [
+			"maven/org.json:json:20211205",
+			"omz/org.omegazero.common:common:latest"
+		]
+	}
+}
