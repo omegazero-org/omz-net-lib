@@ -19,9 +19,11 @@ import org.omegazero.net.socket.SocketConnection;
 public final class NetCommon {
 
 	/**
-	 * The version string of <i>omz-net-lib</i>.
+	 * The version string of <i>omz-net-lib</i>.<br>
+	 * <br>
+	 * This value is set by the build CI pipeline based on the event that triggered the build. Otherwise, this string is always <code>"$BUILDVERSION"</code>.
 	 */
-	public static final String VERSION = "1.3";
+	public static final String VERSION = "$BUILDVERSION";
 
 	/**
 	 * System property <code>org.omegazero.net.printStackTraces</code><br>
