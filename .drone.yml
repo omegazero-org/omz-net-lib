@@ -21,7 +21,8 @@ steps:
 
 - name: build
   # use ECJ because of bug in default JDK 8 compiler (JDK-8139836)
-  image: openjdk-ecj:latest
+  # use older version of ECJ with JDK 8 because of method signature changes in ByteBuffer in newer versions
+  image: openjdk-ecj:4.14
   pull: never
   commands:
   - mkdir bin
