@@ -131,6 +131,7 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 	/**
+	 * {@inheritDoc}
 	 * 
 	 * @return <code>true</code> if this socket is open and available for reading or writing
 	 */
@@ -193,7 +194,7 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 	private int addToWriteBacklog() {
-		synchronized(this.writeBuf){
+		synchronized(super.writeLock){
 			if(!this.writeBuf.hasRemaining())
 				return 0;
 			if(this.writeBufTemp == null){
@@ -213,7 +214,7 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 	private boolean flushWriteBacklog0() throws IOException {
-		synchronized(this.writeBuf){ // sync with writeBuf (not temp) to prevent concurrent write attempts in writeToSocket
+		synchronized(super.writeLock){
 			if(this.isWriteBacklogEmpty())
 				return true;
 			if(this.writeBufTemp.hasRemaining()){
@@ -244,7 +245,7 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 	private boolean isWriteBacklogEmpty() {
-		synchronized(this.writeBuf){
+		synchronized(super.writeLock){
 			return this.writeBacklog.size() == 0 && (this.writeBufTemp == null || !this.writeBufTemp.hasRemaining());
 		}
 	}
@@ -256,7 +257,7 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 	protected final int writeToSocket() throws IOException {
-		synchronized(this.writeBuf){
+		synchronized(super.writeLock){
 			long start = System.currentTimeMillis();
 			this.lastIOTime = start;
 			if(!this.isWriteBacklogEmpty()){
@@ -287,7 +288,7 @@ public abstract class ChannelConnection extends SocketConnection {
 					return;
 				}
 			}
-			synchronized(this.writeBuf){
+			synchronized(super.writeLock){
 				if(!flush && targetBuffer.remaining() >= data.length){
 					targetBuffer.put(data);
 				}else if(data != null && data.length > 0){

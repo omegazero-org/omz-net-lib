@@ -41,6 +41,9 @@ public abstract class SocketConnection {
 
 	private boolean closed = false;
 
+	protected final Object readLock = new Object();
+	protected final Object writeLock = new Object();
+
 
 	/**
 	 * Connects this <code>SocketConnection</code> to the previously specified remote address in the constructor. If no address was specified, this method will throw an
@@ -375,5 +378,26 @@ public abstract class SocketConnection {
 
 	public final void setAttachment(Object attachment) {
 		this.attachment = attachment;
+	}
+
+
+	/**
+	 * Returns the read lock. This object is locked every time a read operation that changes the internal state of the connection is performed.
+	 * 
+	 * @return The read lock
+	 * @since 1.4
+	 */
+	public Object getReadLock() {
+		return this.readLock;
+	}
+
+	/**
+	 * Returns the write lock. This object is locked every time a write operation that changes the internal state of the connection is performed.
+	 * 
+	 * @return The write lock
+	 * @since 1.4
+	 */
+	public Object getWriteLock() {
+		return this.writeLock;
 	}
 }

@@ -139,7 +139,7 @@ public class TLSConnection extends ChannelConnection {
 		try{
 			if(!super.isConnected())
 				return null;
-			synchronized(super.readBuf){
+			synchronized(super.readLock){
 				if(this.handshakeComplete){
 					int read = super.readFromSocket();
 					if(read > 0){
@@ -212,17 +212,17 @@ public class TLSConnection extends ChannelConnection {
 	 */
 	public String getAlpnProtocol() {
 		// an empty string means that no ALPN happened (as specified by SSLEngine.getApplicationProtocol())
-		if(alpnProtocol == null || alpnProtocol.length() < 1)
+		if(this.alpnProtocol == null || this.alpnProtocol.length() < 1)
 			return null;
 		else
-			return alpnProtocol;
+			return this.alpnProtocol;
 	}
 
 
 	private void closeOutbound() {
 		this.sslEngine.closeOutbound();
 		if(super.isConnected()){
-			synchronized(super.writeBuf){
+			synchronized(super.writeLock){
 				try{
 					int count = 0;
 					SSLEngineResult result;

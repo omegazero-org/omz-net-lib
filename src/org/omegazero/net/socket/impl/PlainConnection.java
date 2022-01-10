@@ -44,7 +44,7 @@ public class PlainConnection extends ChannelConnection {
 		try{
 			if(!super.isConnected())
 				return null;
-			synchronized(super.readBuf){
+			synchronized(super.readLock){
 				super.readBuf.clear();
 				if(super.readFromSocket() >= 0){
 					super.readBuf.flip();
