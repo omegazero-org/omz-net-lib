@@ -112,32 +112,37 @@ public abstract class SocketConnection {
 	public abstract void destroy();
 
 	/**
+	 * Returns <code>true</code> if this socket is connected.
 	 * 
-	 * @return <code>true</code> if this socket is connected.
+	 * @return <code>true</code> if this socket is connected
 	 */
 	public abstract boolean isConnected();
 
 	/**
+	 * Returns the {@linkplain SocketAddress address} of the remote host.
 	 * 
 	 * @return The address of the peer host
 	 */
 	public abstract SocketAddress getRemoteAddress();
 
 	/**
+	 * Returns the local {@linkplain SocketAddress address} of this connection.
 	 * 
 	 * @return The local address of this connection
 	 */
 	public abstract SocketAddress getLocalAddress();
 
 	/**
+	 * Returns the last time any data was sent over this connection, either incoming or outgoing, as returned by {@link System#currentTimeMillis()}.
 	 * 
-	 * @return The last time any data was sent over this connection, either incoming or outgoing, as returned by {@link System#currentTimeMillis()}
+	 * @return The last time any data was sent over this connection in milliseconds
 	 */
 	public abstract long getLastIOTime();
 
 	/**
+	 * Returns <code>true</code> if this socket is writable, meaning data passed to {@link #write(byte[])} will not be buffered but written to the socket directly.
 	 * 
-	 * @return <code>true</code> if this socket is writable, meaning data passed to {@link #write(byte[])} will not be buffered but written to the socket directly
+	 * @return <code>true</code> if this socket is writable
 	 */
 	public abstract boolean isWritable();
 
@@ -323,6 +328,9 @@ public abstract class SocketConnection {
 	}
 
 
+	/**
+	 * Called by implementing classes if this connection was established immediately upon calling {@link #connect(int)}. May be used internally by the connection manager.
+	 */
 	protected final void localConnect() {
 		if(this.onLocalConnect != null)
 			this.onLocalConnect.accept(this);
@@ -330,6 +338,9 @@ public abstract class SocketConnection {
 			this.handleConnect();
 	}
 
+	/**
+	 * Called by implementing classes when this connection was closed using any close method ({@link #close()} or {@link #destroy()}).
+	 */
 	protected final void localClose() {
 		if(this.onLocalClose != null)
 			this.onLocalClose.accept(this);
@@ -337,6 +348,11 @@ public abstract class SocketConnection {
 			this.handleClose();
 	}
 
+	/**
+	 * Called by implementing classes to queue data for writing before this connection {@linkplain #hasConnected() has connected}.
+	 * 
+	 * @param data The data
+	 */
 	protected final synchronized void queueWrite(byte[] data) {
 		if(this.writeQueue != null)
 			this.writeQueue.add(data);
