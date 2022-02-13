@@ -33,8 +33,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLServerSocketFactory;
 
-import com.mendix.ssltools.PrivateKeyReader;
-
 public final class SSLUtil {
 
 	private SSLUtil() {
