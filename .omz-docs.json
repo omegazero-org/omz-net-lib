@@ -2,13 +2,19 @@
 	"generator": "javadoc",
 	"targetName": "omz-net-lib",
 	"generatorOptions": {
-		"src": ["src"],
+		"src": [
+			"net-common/main/java",
+			"net-client/main/java",
+			"net-server/main/java"
+		],
 		"packages": ["org"],
 		"windowtitle": "omegazero Java Network Library",
 		"doctitle": "omegazero Java Network Library documentation",
 		"header": "omz net lib",
 		"groups": {
-			"Networking Packages": "org.omegazero.net.*"
+			"Lib: common": "org.omegazero.net.common:org.omegazero.net.socket:org.omegazero.net.socket.*:org.omegazero.net.util",
+			"Lib: client": "org.omegazero.net.client:org.omegazero.net.client.*",
+			"Lib: server": "org.omegazero.net.server:org.omegazero.net.server.*"
 		},
 		"links": [
 			"https://docs.oracle.com/javase/8/docs/api/",
@@ -17,7 +23,7 @@
 		],
 		"dependencies": [
 			"maven/org.json:json:20211205",
-			"omz/org.omegazero.common:common:latest"
+			"omz/org.omegazero.common:omz-common:latest"
 		]
 	}
 }

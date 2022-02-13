@@ -11,34 +11,74 @@ steps:
   pull: never
   commands:
   - artifact-dl-java maven/org.json:json:20211205
-  - artifact-dl-java omz/org.omegazero.common:common:latest
+  - artifact-dl-java omz/org.omegazero.common:omz-common:latest
 
 - name: prepare-source
   image: omz-ci-tools
   pull: never
   commands:
-  - setversion src/org/omegazero/net/common/NetCommon.java
+  - mkdir build
+  - setversion net-common/main/java/org/omegazero/net/common/NetCommon.java
 
-- name: build
+- name: build-common
   # use ECJ because of bug in default JDK 8 compiler (JDK-8139836)
   # use older version of ECJ with JDK 8 because of method signature changes in ByteBuffer in newer versions
   image: openjdk-ecj:4.14
   pull: never
   commands:
-  - mkdir bin
-  - ecj -verbose -d bin -cp json-20211205.jar:common-latest.jar -8 src
-  - jar cf build.jar -C bin .
+  - mkdir -p build/common/bin
+  - ecj -verbose -d build/common/bin -cp json-20211205.jar:omz-common-latest.jar -8 net-common/main/java
+  - jar cf build-common.jar -C build/common/bin .
   depends_on:
   - prepare-dependencies
   - prepare-source
+
+- name: build-client
+  image: openjdk-ecj:4.14
+  pull: never
+  commands:
+  - mkdir -p build/client/bin
+  - ecj -verbose -d build/client/bin -cp json-20211205.jar:omz-common-latest.jar:build-common.jar -8 net-client/main/java
+  - jar cf build-client.jar -C build/client/bin .
+  depends_on:
+  - prepare-dependencies
+  - prepare-source
+  - build-common
+
+- name: build-server
+  image: openjdk-ecj:4.14
+  pull: never
+  commands:
+  - mkdir -p build/server/bin
+  - ecj -verbose -d build/server/bin -cp json-20211205.jar:omz-common-latest.jar:build-common.jar -8 net-server/main/java
+  - jar cf build-server.jar -C build/server/bin .
+  depends_on:
+  - prepare-dependencies
+  - prepare-source
+  - build-common
+
+- name: build-all
+  image: openjdk-ecj:4.14
+  pull: never
+  commands:
+  - mkdir -p build/all/bin
+  - cp -r build/common/bin/* build/client/bin/* build/server/bin/* build/all/bin
+  - jar cf build-all.jar -C build/all/bin .
+  depends_on:
+  - build-common
+  - build-client
+  - build-server
 
 - name: publish
   image: omz-ci-tools
   pull: never
   commands:
-  - artifact-push-java build.jar omz/org.omegazero.net:netlib
+  - artifact-push-java build-all.jar omz/org.omegazero.net:omz-netlib
+  - artifact-push-java build-common.jar omz/org.omegazero.net:omz-netlib-common
+  - artifact-push-java build-client.jar omz/org.omegazero.net:omz-netlib-client
+  - artifact-push-java build-server.jar omz/org.omegazero.net:omz-netlib-server
   depends_on:
-  - build
+  - build-all
   environment:
     OMZ_ARTIFACT_PUSH_TOKEN:
       from_secret: artifact_push_token
