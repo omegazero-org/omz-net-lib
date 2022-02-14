@@ -33,10 +33,10 @@ import org.omegazero.common.event.Tasks;
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.net.common.ConnectionSelectorHandler;
-import org.omegazero.net.common.SyncWorker;
 import org.omegazero.net.socket.ChannelConnection;
 import org.omegazero.net.socket.SocketConnection;
 import org.omegazero.net.socket.provider.DatagramChannelProvider;
+import org.omegazero.net.util.SyncWorker;
 
 /**
  * UDP/IP server implementation of a {@link NetServer} based on java.nio channels.

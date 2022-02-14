@@ -9,12 +9,21 @@
  * is free of defects, merchantable, fit for a particular purpose or non-infringing.
  * The entire risk as to the quality and performance of the Covered Software is with You.
  */
-package org.omegazero.net.common;
+package org.omegazero.net.util;
 
 import java.util.function.Consumer;
 
+/**
+ * A {@code Runnable} consumer that executes given {@code Runnable}s synchronously.
+ */
 public class SyncWorker implements Consumer<Runnable> {
 
+
+	/**
+	 * {@linkplain Runnable#run() Runs} the given {@code Runnable}.
+	 * 
+	 * @param t The {@code Runnable}
+	 */
 	@Override
 	public void accept(Runnable t) {
 		t.run();

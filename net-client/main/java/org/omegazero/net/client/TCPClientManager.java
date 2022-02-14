@@ -24,9 +24,9 @@ import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.common.ConnectionSelectorHandler;
 import org.omegazero.net.common.NetCommon;
-import org.omegazero.net.common.SyncWorker;
 import org.omegazero.net.socket.ChannelConnection;
 import org.omegazero.net.socket.SocketConnection;
+import org.omegazero.net.util.SyncWorker;
 
 public abstract class TCPClientManager extends ConnectionSelectorHandler implements NetClientManager {
 
