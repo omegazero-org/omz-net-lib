@@ -112,6 +112,12 @@ public abstract class ChannelConnection extends SocketConnection {
 		}
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * 
+	 * @implSpec This method does not write remaining data in this {@link ChannelConnection}'s {@code writeBuf}. Subclasses must override this method to implement this
+	 *           behavior.
+	 */
 	@Override
 	public boolean flush() {
 		return this.flushWriteBacklog();
@@ -279,23 +285,29 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 
-	protected final void writeBuffered(byte[] data, boolean flush, ByteBuffer targetBuffer, ThrowingRunnable writeOut) {
+	protected final void writeBuffered(byte[] data, int offset, int length, boolean flush, ByteBuffer targetBuffer, ThrowingRunnable writeOut) {
+		if(data != null && (offset < 0 || offset + length > data.length))
+			throw new IllegalArgumentException("offset=" + offset + " length=" + length + " data.length=" + data.length);
 		try{
 			synchronized(this){
 				if(!super.hasConnected()){
-					if(data != null && data.length > 0)
-						super.queueWrite(data);
+					if(data != null && length > 0){
+						if(offset == 0 && length == data.length)
+							super.queueWrite(data);
+						else
+							super.queueWrite(java.util.Arrays.copyOfRange(data, offset, offset + length));
+					}
 					return;
 				}
 			}
 			synchronized(super.writeLock){
-				if(!flush && targetBuffer.remaining() >= data.length){
-					targetBuffer.put(data);
-				}else if(data != null && data.length > 0){
+				if(!flush && targetBuffer.remaining() >= length){
+					targetBuffer.put(data, offset, length);
+				}else if(data != null && length > 0){
 					int written = 0;
-					while(written < data.length){
-						int wr = Math.min(targetBuffer.remaining(), data.length - written);
-						targetBuffer.put(data, written, wr);
+					while(written < length){
+						int wr = Math.min(targetBuffer.remaining(), length - written);
+						targetBuffer.put(data, written + offset, wr);
 						targetBuffer.flip();
 						writeOut.run();
 						targetBuffer.clear();

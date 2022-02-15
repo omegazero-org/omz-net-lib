@@ -64,18 +64,18 @@ public class PlainConnection extends ChannelConnection {
 	}
 
 	@Override
-	public void write(byte[] data) {
-		super.writeBuffered(data, true, super.writeBuf, super::writeToSocket);
+	public void write(byte[] data, int offset, int length) {
+		super.writeBuffered(data, offset, length, true, super.writeBuf, super::writeToSocket);
 	}
 
 	@Override
-	public void writeQueue(byte[] data) {
-		super.writeBuffered(data, false, super.writeBuf, super::writeToSocket);
+	public void writeQueue(byte[] data, int offset, int length) {
+		super.writeBuffered(data, offset, length, false, super.writeBuf, super::writeToSocket);
 	}
 
 	@Override
 	public boolean flush() {
-		super.writeBuffered(null, true, super.writeBuf, super::writeToSocket);
+		super.writeBuffered(null, 0, 0, true, super.writeBuf, super::writeToSocket);
 		return super.flush();
 	}
 }

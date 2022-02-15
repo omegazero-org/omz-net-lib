@@ -163,18 +163,18 @@ public class TLSConnection extends ChannelConnection {
 	}
 
 	@Override
-	public void write(byte[] data) {
-		super.writeBuffered(data, true, this.writeBufUnwrapped, this::writeWrapped);
+	public void write(byte[] data, int offset, int length) {
+		super.writeBuffered(data, offset, length, true, this.writeBufUnwrapped, this::writeWrapped);
 	}
 
 	@Override
-	public void writeQueue(byte[] data) {
-		super.writeBuffered(data, false, this.writeBufUnwrapped, this::writeWrapped);
+	public void writeQueue(byte[] data, int offset, int length) {
+		super.writeBuffered(data, offset, length, false, this.writeBufUnwrapped, this::writeWrapped);
 	}
 
 	@Override
 	public boolean flush() {
-		super.writeBuffered(null, true, this.writeBufUnwrapped, this::writeWrapped);
+		super.writeBuffered(null, 0, 0, true, this.writeBufUnwrapped, this::writeWrapped);
 		return super.flush();
 	}
 

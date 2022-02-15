@@ -22,7 +22,7 @@ import org.omegazero.net.common.ThrowingRunnable;
 /**
  * Represents any type of connection between the local and a remote host.
  */
-public abstract class SocketConnection {
+public abstract class SocketConnection implements AutoCloseable {
 
 	private ThrowingRunnable onConnect;
 	private ThrowingRunnable onTimeout;
@@ -69,28 +69,75 @@ public abstract class SocketConnection {
 	public abstract byte[] read();
 
 	/**
-	 * Writes data to this connection for delivery to the peer host.<br>
-	 * <br>
-	 * This function is non-blocking and may store data in a temporary write buffer if the underlying socket is busy. An application should try to respect the value of
-	 * {@link #isWritable()} to reduce memory consumption by such write buffer if a lot of data is being written.<br>
-	 * <br>
-	 * If this method is called before the <code>onConnect</code> event, the data is queued in a temporary buffer and written out when the socket connects.
+	 * Writes data to this connection for delivery to the peer host.
+	 * <p>
+	 * A call to this method is equivalent to a call to
 	 * 
-	 * @param data The data to be written to this connection
+	 * <pre>
+	 * <code>
+	 * {@link #write(byte[], int, int) write}(data, 0, data.length);
+	 * </code>
+	 * </pre>
+	 * 
+	 * @param data The data to write
+	 * @see #write(byte[], int, int)
 	 * @see #writeQueue(byte[])
 	 */
-	public abstract void write(byte[] data);
+	public void write(byte[] data) {
+		this.write(data, 0, data.length);
+	}
 
 	/**
-	 * Similar to {@link #write(byte[])}, except that no attempt will be made to immediately flush the data to the socket, if supported by the implementation.<br>
-	 * <br>
-	 * The default behavior is to call {@link #write(byte[])}. Subclasses should override this method.
+	 * Writes data to this connection for delivery to the peer host.
+	 * <p>
+	 * This function is non-blocking and may store data in a temporary write buffer if the underlying socket is busy. An application should try to respect the value of
+	 * {@link #isWritable()} to reduce memory consumption by such write buffer if a lot of data is being written.
+	 * <p>
+	 * If this method is called before the <code>onConnect</code> event, the data is queued in a temporary buffer and written out when the socket connects.
 	 * 
-	 * @param data The data
+	 * @param data   The data to write
+	 * @param offset The start index of the data to write in the <b>data</b> byte array
+	 * @param length The total number of bytes to write from the <b>data</b> byte array, starting at <b>offset</b>
+	 * @throws IllegalArgumentException If <b>offset</b> is negative or if the end index would exceed the length of the array
+	 * @since 1.5
+	 * @see #write(byte[])
+	 * @see #writeQueue(byte[], int, int)
+	 */
+	public abstract void write(byte[] data, int offset, int length);
+
+	/**
+	 * Similar to {@link #write(byte[])}, except that no attempt will be made to immediately flush the data to the socket, if supported by the implementation.
+	 * <p>
+	 * A call to this method is equivalent to a call to
+	 * 
+	 * <pre>
+	 * <code>
+	 * {@link #writeQueue(byte[], int, int) writeQueue}(data, 0, data.length);
+	 * </code>
+	 * </pre>
+	 * 
+	 * @param data The data to write
+	 * @see #writeQueue(byte[], int, int)
 	 * @see #write(byte[])
 	 */
 	public void writeQueue(byte[] data) {
-		this.write(data);
+		this.writeQueue(data, 0, data.length);
+	}
+
+	/**
+	 * Similar to {@link #write(byte[], int, int)}, except that no attempt will be made to immediately flush the data to the socket, if supported by the implementation.
+	 * 
+	 * @param data   The data to write
+	 * @param offset The start index of the data to write in the <b>data</b> byte array
+	 * @param length The total number of bytes to write from the <b>data</b> byte array, starting at <b>offset</b>
+	 * @throws IllegalArgumentException If <b>offset</b> is negative or if the end index would exceed the length of the array
+	 * @since 1.5
+	 * @see #writeQueue(byte[])
+	 * @see #write(byte[], int, int)
+	 * @implNote The default behavior is to call {@link #write(byte[], int, int)}. Subclasses should override this method.
+	 */
+	public void writeQueue(byte[] data, int offset, int length) {
+		this.write(data, offset, length);
 	}
 
 	/**
@@ -105,6 +152,7 @@ public abstract class SocketConnection {
 	/**
 	 * Closes this connection after all remaining data has been flushed to the socket, which may not be immediately.
 	 */
+	@Override
 	public abstract void close();
 
 	/**
@@ -323,8 +371,9 @@ public abstract class SocketConnection {
 	}
 
 	/**
+	 * Returns <code>true</code> if the <i>onConnect</i> event has ever executed. This is already <code>true</code> while running the event.
 	 * 
-	 * @return <code>true</code> if the onConnect event has ever fired
+	 * @return <code>true</code> if the <i>onConnect</i> event has ever fired
 	 */
 	public final boolean hasConnected() {
 		return this.writeQueue == null; // writeQueue gets deleted in handleConnect/flushWriteQueue
