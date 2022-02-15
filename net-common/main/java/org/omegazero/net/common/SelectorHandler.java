@@ -198,6 +198,10 @@ public abstract class SelectorHandler {
 		int selectorRebuilds = 0;
 		while(this.running){
 			this.loopIteration();
+			// loopIteration may do anything including calling socket callbacks, which can in turn close this SelectorHandler
+			// -> need to check again if running is true to not try and select on a closed selector
+			if(!this.running)
+				break;
 			if(this.selector.select() != 0){
 				synchronized(this){
 					if(!this.selector.isOpen())
