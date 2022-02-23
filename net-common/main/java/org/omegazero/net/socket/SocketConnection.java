@@ -95,7 +95,7 @@ public abstract class SocketConnection implements AutoCloseable {
 	 * <p>
 	 * If this method is called before the <code>onConnect</code> event, the data is queued in a temporary buffer and written out when the socket connects.
 	 * 
-	 * @param data   The data to write
+	 * @param data The data to write
 	 * @param offset The start index of the data to write in the <b>data</b> byte array
 	 * @param length The total number of bytes to write from the <b>data</b> byte array, starting at <b>offset</b>
 	 * @throws IllegalArgumentException If <b>offset</b> is negative or if the end index would exceed the length of the array
@@ -127,7 +127,7 @@ public abstract class SocketConnection implements AutoCloseable {
 	/**
 	 * Similar to {@link #write(byte[], int, int)}, except that no attempt will be made to immediately flush the data to the socket, if supported by the implementation.
 	 * 
-	 * @param data   The data to write
+	 * @param data The data to write
 	 * @param offset The start index of the data to write in the <b>data</b> byte array
 	 * @param length The total number of bytes to write from the <b>data</b> byte array, starting at <b>offset</b>
 	 * @throws IllegalArgumentException If <b>offset</b> is negative or if the end index would exceed the length of the array
@@ -220,7 +220,7 @@ public abstract class SocketConnection implements AutoCloseable {
 	/**
 	 * 
 	 * @return The apparent remote address previously set by {@link SocketConnection#setApparentRemoteAddress(SocketAddress)}, or the address returned by
-	 *         {@link SocketConnection#getRemoteAddress()} if none was set
+	 * {@link SocketConnection#getRemoteAddress()} if none was set
 	 */
 	public final SocketAddress getApparentRemoteAddress() {
 		if(this.apparentRemoteAddress != null)
@@ -377,6 +377,16 @@ public abstract class SocketConnection implements AutoCloseable {
 	 */
 	public final boolean hasConnected() {
 		return this.writeQueue == null; // writeQueue gets deleted in handleConnect/flushWriteQueue
+	}
+
+	/**
+	 * Returns <code>true</code> if this socket {@linkplain #hasConnected() has connected} but is no longer {@linkplain #isConnected() connected}.
+	 * 
+	 * @return <code>true</code> if this socket has disconnected
+	 * @since 1.6
+	 */
+	public boolean hasDisconnected() {
+		return this.hasConnected() && !this.isConnected();
 	}
 
 
