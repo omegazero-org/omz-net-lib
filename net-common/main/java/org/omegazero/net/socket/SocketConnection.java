@@ -18,6 +18,7 @@ import java.util.function.Consumer;
 
 import org.omegazero.net.common.ThrowingConsumer;
 import org.omegazero.net.common.ThrowingRunnable;
+import org.omegazero.net.common.UnhandledException;
 
 /**
  * Represents any type of connection between the local and a remote host.
@@ -284,7 +285,7 @@ public abstract class SocketConnection implements AutoCloseable {
 			this.onError.accept(e);
 			this.destroy();
 		}else
-			throw new RuntimeException("Socket Error", e);
+			throw new UnhandledException(e);
 	}
 
 	public final void handleClose() {
