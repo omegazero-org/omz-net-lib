@@ -148,6 +148,17 @@ public abstract class SocketConnection implements AutoCloseable {
 	}
 
 	/**
+	 * Writes the given <b>string</b> encoded using {@code UTF-8} to this connection for delivery to the peer host.
+	 * 
+	 * @param string The string
+	 * @since 1.6
+	 * @see #write(byte[])
+	 */
+	public void write(String string) {
+		this.write(string.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+	}
+
+	/**
 	 * Attempts to flush any queued data after a call to {@link #writeQueue(byte[])} or data that could not be written previously because the socket was busy.
 	 * 
 	 * @return <code>true</code> if all data could be written to the socket
