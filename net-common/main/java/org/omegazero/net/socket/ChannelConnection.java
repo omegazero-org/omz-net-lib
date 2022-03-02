@@ -82,8 +82,14 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 
+	/**
+	 * Must be called by subclass constructors. This method creates the {@link #readBuf} and {@link #writeBuf} buffers and any additional buffers required.
+	 */
 	protected abstract void createBuffers();
 
+	/**
+	 * Forcibly closes this connection.
+	 */
 	protected void close0() {
 		synchronized(this){
 			if(this.closed)
@@ -116,7 +122,7 @@ public abstract class ChannelConnection extends SocketConnection {
 	 * {@inheritDoc}
 	 * 
 	 * @implSpec This method does not write remaining data in this {@link ChannelConnection}'s {@code writeBuf}. Subclasses must override this method to implement this
-	 *           behavior.
+	 * behavior.
 	 */
 	@Override
 	public boolean flush() {
@@ -257,11 +263,23 @@ public abstract class ChannelConnection extends SocketConnection {
 	}
 
 
+	/**
+	 * Reads data into the {@linkplain #readBuf read buffer} using this {@link ChannelConnection}'s {@link ChannelProvider}.
+	 * 
+	 * @return The number of bytes read
+	 * @throws IOException If an IO error occurs
+	 */
 	protected final int readFromSocket() throws IOException {
 		this.lastIOTime = System.currentTimeMillis();
 		return this.provider.read(this.readBuf);
 	}
 
+	/**
+	 * Writes data from the {@linkplain #writeBuf write buffer} using this {@link ChannelConnection}'s {@link ChannelProvider}.
+	 * 
+	 * @return The number of bytes written, including buffered bytes
+	 * @throws IOException If an IO error occurs
+	 */
 	protected final int writeToSocket() throws IOException {
 		synchronized(super.writeLock){
 			long start = System.currentTimeMillis();

@@ -42,16 +42,22 @@ public abstract class SocketConnection implements AutoCloseable {
 
 	private boolean closed = false;
 
+	/**
+	 * Lock for read operations.
+	 */
 	protected final Object readLock = new Object();
+	/**
+	 * Lock for write operations.
+	 */
 	protected final Object writeLock = new Object();
 
 
 	/**
 	 * Connects this <code>SocketConnection</code> to the previously specified remote address in the constructor. If no address was specified, this method will throw an
-	 * <code>UnsupportedOperationException</code><br>
-	 * <br>
-	 * This function is non-blocking.<br>
-	 * <br>
+	 * <code>UnsupportedOperationException</code>.
+	 * <p>
+	 * This function is non-blocking.
+	 * <p>
 	 * A connection timeout in milliseconds may be specified in the <b>timeout</b> parameter. If the connection has not been established within this timeout, the handler set
 	 * using {@link #setOnTimeout(Runnable)} is called and the connection is closed. Depending on the implementation and underlying protocol, a timeout may occur earlier or
 	 * never and may instead cause the <code>onError</code> callback to be called.
@@ -61,8 +67,8 @@ public abstract class SocketConnection implements AutoCloseable {
 	public abstract void connect(int timeout);
 
 	/**
-	 * Reads data received from the peer host on this connection. <br>
-	 * <br>
+	 * Reads data received from the peer host on this connection.
+	 * <p>
 	 * This function is non-blocking. If no data was available, <code>null</code> is returned.
 	 * 
 	 * @return The read data or <code>null</code> if no data is available.
@@ -157,8 +163,8 @@ public abstract class SocketConnection implements AutoCloseable {
 	public abstract void close();
 
 	/**
-	 * Similar to {@link #close()}, except that the connection is closed immediately, without waiting for data to be flushed to the socket.<br>
-	 * <br>
+	 * Similar to {@link #close()}, except that the connection is closed immediately, without waiting for data to be flushed to the socket.
+	 * <p>
 	 * {@link #isConnected()} should return <code>false</code> immediately after calling this method.
 	 */
 	public abstract void destroy();
@@ -208,8 +214,8 @@ public abstract class SocketConnection implements AutoCloseable {
 
 
 	/**
-	 * Sets a possibly different remote address a client claims to be or act on behalf of.<br>
-	 * <br>
+	 * Sets a possibly different remote address a client claims to be or act on behalf of.
+	 * <p>
 	 * For example, if a connection received by a server was proxied through a proxy, this should be set to the actual client address.
 	 * 
 	 * @param apparentRemoteAddress The apparent address of the peer
@@ -219,9 +225,10 @@ public abstract class SocketConnection implements AutoCloseable {
 	}
 
 	/**
+	 * Returns the apparent remote address previously set by {@link #setApparentRemoteAddress(SocketAddress)}, or the address returned by {@link #getRemoteAddress()} if none
+	 * was set.
 	 * 
-	 * @return The apparent remote address previously set by {@link SocketConnection#setApparentRemoteAddress(SocketAddress)}, or the address returned by
-	 * {@link SocketConnection#getRemoteAddress()} if none was set
+	 * @return The apparent remote address
 	 */
 	public final SocketAddress getApparentRemoteAddress() {
 		if(this.apparentRemoteAddress != null)
@@ -254,9 +261,11 @@ public abstract class SocketConnection implements AutoCloseable {
 	}
 
 	/**
+	 * Called by classes managing this {@link SocketConnection} if data was received using {@link #read()}. This method calls the {@code onData} callback.
 	 * 
 	 * @param data The data that was received on this connection
 	 * @return <code>false</code> if no <code>onData</code> handler was set
+	 * @see #setOnData(ThrowingConsumer)
 	 */
 	public final boolean handleData(byte[] data) {
 		if(this.onData == null)
@@ -269,6 +278,11 @@ public abstract class SocketConnection implements AutoCloseable {
 		return true;
 	}
 
+	/**
+	 * Called by subclasses if this socket is writable. This method calls the {@code onWritable} callback.
+	 * 
+	 * @see #setOnWritable(ThrowingRunnable)
+	 */
 	public final void handleWritable() {
 		try{
 			// onWritable can happen before onConnect, for example when flushing the write backlog, but that should be suppressed
@@ -280,6 +294,14 @@ public abstract class SocketConnection implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Called by subclasses or classes managing this {@link SocketConnection} if an error occurred in a callback. This method calls the {@code onError} callback and
+	 * {@linkplain #destroy() forcibly closes} this connection.
+	 * 
+	 * @param e The error
+	 * @throws UnhandledException If no {@code onError} handler is set
+	 * @see #setOnError(Consumer)
+	 */
 	public final void handleError(Throwable e) {
 		if(this.onError != null){
 			this.onError.accept(e);
@@ -288,6 +310,12 @@ public abstract class SocketConnection implements AutoCloseable {
 			throw new UnhandledException(e);
 	}
 
+	/**
+	 * Called by subclasses or classes managing this {@link SocketConnection} if this connection closed. This method calls the {@code onError} callback on the first invocation
+	 * of this method.
+	 * 
+	 * @see #setOnClose(ThrowingRunnable)
+	 */
 	public final void handleClose() {
 		if(this.closed)
 			return;
@@ -349,8 +377,8 @@ public abstract class SocketConnection implements AutoCloseable {
 	}
 
 	/**
-	 * Sets a callback that is called when an error occurs on this connection.<br>
-	 * <br>
+	 * Sets a callback that is called when an error occurs on this connection.
+	 * <p>
 	 * This callback is usually followed by a <code>onClose</code> (set using {@link SocketConnection#setOnClose(Runnable)}) callback.
 	 * 
 	 * @param onError The callback

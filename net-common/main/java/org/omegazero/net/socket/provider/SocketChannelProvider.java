@@ -20,6 +20,9 @@ import java.nio.channels.SocketChannel;
 import org.omegazero.common.event.Tasks;
 import org.omegazero.net.socket.ChannelConnection;
 
+/**
+ * A {@link ChannelProvider} for {@link SocketChannel}s.
+ */
 public class SocketChannelProvider implements ChannelProvider {
 
 	private ChannelConnection connection;

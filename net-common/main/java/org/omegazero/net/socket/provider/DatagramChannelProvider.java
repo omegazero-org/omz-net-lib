@@ -22,6 +22,11 @@ import java.util.function.Consumer;
 
 import org.omegazero.net.socket.ChannelConnection;
 
+/**
+ * A {@link ChannelProvider} for {@link DatagramChannel}s.
+ * <p>
+ * {@code DatagramChannelProvider} for incoming connections on servers need to pass incoming data to {@link #addReadData(byte[])}.
+ */
 public class DatagramChannelProvider implements ChannelProvider {
 
 	private final SocketAddress remote;
@@ -44,7 +49,7 @@ public class DatagramChannelProvider implements ChannelProvider {
 	/**
 	 * This constructor should be used if the datagram channel is used as a server.
 	 * 
-	 * @param remote             The address of the client
+	 * @param remote The address of the client
 	 * @param notifyWriteBacklog Callback when the channel is experiencing write backlog
 	 */
 	public DatagramChannelProvider(SocketAddress remote, Consumer<ChannelConnection> notifyWriteBacklog) { // for incoming requests
@@ -53,6 +58,11 @@ public class DatagramChannelProvider implements ChannelProvider {
 	}
 
 
+	/**
+	 * Used for incoming connections on servers. Data received on the server datagram socket must be passed to this method on the appropriate connection instance.
+	 * 
+	 * @param data The data
+	 */
 	public void addReadData(byte[] data) {
 		this.readBacklog.add(data);
 	}
