@@ -13,15 +13,31 @@ package org.omegazero.net.client.params;
 
 import java.net.SocketAddress;
 
+/**
+ * Extended {@link ConnectionParameters} for connections encrypted using TLS.
+ */
 public class TLSConnectionParameters extends ConnectionParameters {
+
 
 	private String[] alpnNames;
 	private String[] sniOptions;
 
+
+	/**
+	 * Creates new {@link TLSConnectionParameters}.
+	 * 
+	 * @param remote The remote address
+	 */
 	public TLSConnectionParameters(SocketAddress remote) {
 		super(remote);
 	}
 
+	/**
+	 * Creates new {@link TLSConnectionParameters}.
+	 * 
+	 * @param remote The remote address
+	 * @param local The local address to bind to
+	 */
 	public TLSConnectionParameters(SocketAddress remote, SocketAddress local) {
 		super(remote, local);
 	}
@@ -38,13 +54,18 @@ public class TLSConnectionParameters extends ConnectionParameters {
 		this.alpnNames = alpnNames;
 	}
 
+	/**
+	 * Returns the configured ALPN options using {@link #setAlpnNames(String[])}.
+	 * 
+	 * @return The configured ALPN options
+	 */
 	public String[] getAlpnNames() {
 		return this.alpnNames;
 	}
 
 	/**
-	 * Sets the list of requested server names using TLS SNI (Server Name Indication).<br>
-	 * <br>
+	 * Sets the list of requested server names using TLS SNI (Server Name Indication).
+	 * <p>
 	 * If not set or <code>null</code> is passed, SNI is disabled.
 	 * 
 	 * @param sniOptions The list of requested server names
@@ -53,7 +74,12 @@ public class TLSConnectionParameters extends ConnectionParameters {
 		this.sniOptions = sniOptions;
 	}
 
+	/**
+	 * Returns the configured SNI options using {@link #setSniOptions(String[])}.
+	 * 
+	 * @return The configured SNI options
+	 */
 	public String[] getSniOptions() {
-		return sniOptions;
+		return this.sniOptions;
 	}
 }

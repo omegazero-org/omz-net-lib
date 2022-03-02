@@ -13,26 +13,52 @@ package org.omegazero.net.client.params;
 
 import java.net.SocketAddress;
 
+/**
+ * Contains parameters for creating {@linkplain org.omegazero.net.client.NetClientManager#connection(ConnectionParameters) outgoing connections}.
+ */
 public class ConnectionParameters {
+
 
 	private final SocketAddress remote;
 	private final SocketAddress local;
 
+
+	/**
+	 * Creates new {@link ConnectionParameters}.
+	 * 
+	 * @param remote The remote address
+	 */
 	public ConnectionParameters(SocketAddress remote) {
 		this(remote, null);
 	}
 
+	/**
+	 * Creates new {@link ConnectionParameters}.
+	 * 
+	 * @param remote The remote address
+	 * @param local The local address to bind to
+	 */
 	public ConnectionParameters(SocketAddress remote, SocketAddress local) {
 		this.remote = remote;
 		this.local = local;
 	}
 
 
+	/**
+	 * Returns the configured remote address.
+	 * 
+	 * @return The configured remote address
+	 */
 	public SocketAddress getRemote() {
-		return remote;
+		return this.remote;
 	}
 
+	/**
+	 * Returns the configured local address.
+	 * 
+	 * @return The configured local address
+	 */
 	public SocketAddress getLocal() {
-		return local;
+		return this.local;
 	}
 }
