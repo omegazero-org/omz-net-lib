@@ -181,9 +181,16 @@ public class TLSConnection extends ChannelConnection {
 	private void writeWrapped() throws IOException {
 		while(this.writeBufUnwrapped.hasRemaining()){
 			super.writeBuf.clear();
+			int beforeDataLen = this.writeBufUnwrapped.remaining();
 			SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
 			if(result.getStatus() == Status.OK){
+				if(this.writeBufUnwrapped.remaining() >= beforeDataLen)
+					throw new IOException("wrap returned OK but no data was written");
 				super.writeBuf.flip();
+				if(!super.writeBuf.hasRemaining()){
+					this.writeBufUnwrapped.clear();
+					throw new IOException("writeBuf is empty after wrap");
+				}
 				super.writeToSocket();
 			}else
 				throw new SSLException("Write SSL wrap failed: " + result.getStatus());
