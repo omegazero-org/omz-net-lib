@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
+import org.omegazero.net.socket.ChannelConnection;
 import org.omegazero.net.socket.SocketConnection;
 
 public abstract class ConnectionSelectorHandler extends SelectorHandler {
@@ -31,7 +32,7 @@ public abstract class ConnectionSelectorHandler extends SelectorHandler {
 	// preferably the thread executing the selectorLoop() should emit all events and that likely wouldnt be the case because close() may be called by any thread.
 	// this is now the primary way of communicating closes, including when the peer closes the connection
 	// subclasses must call setOnLocalClose(super::onConnectionClosed) on any ChannelConnection instance created
-	private Collection<SocketConnection> closedConnections = new ConcurrentLinkedQueue<>();
+	private Collection<ChannelConnection> closedConnections = new ConcurrentLinkedQueue<>();
 
 
 	/**
@@ -46,24 +47,27 @@ public abstract class ConnectionSelectorHandler extends SelectorHandler {
 
 
 	/**
-	 * Notify this <code>ConnectionSelectorHandler</code> that a connection was closed locally by a call to {@link SocketConnection#close()}.
+	 * Notify this <code>ConnectionSelectorHandler</code> that a {@code ChannelConnection} was closed locally by a call to {@link SocketConnection#close()}.
 	 * 
 	 * @param conn The connection that closed
 	 */
 	protected void onConnectionClosed(SocketConnection conn) {
-		this.closedConnections.add(conn);
+		this.closedConnections.add((ChannelConnection) conn);
 		super.selectorWakeup();
 	}
 
 
 	@Override
-	protected void loopIteration() throws IOException {
+	protected synchronized void loopIteration() throws IOException {
 		if(this.closedConnections.size() > 0){
-			Iterator<SocketConnection> closeIterator = this.closedConnections.iterator();
+			Iterator<ChannelConnection> closeIterator = this.closedConnections.iterator();
 			while(closeIterator.hasNext()){
 				logger.trace("Handling local close");
-				this.handleConnectionClosed(closeIterator.next());
+				ChannelConnection conn = closeIterator.next();
 				closeIterator.remove();
+				synchronized(conn.getProvider().getSelectionKey()){
+					this.handleConnectionClosed(conn);
+				}
 			}
 		}
 	}

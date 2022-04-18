@@ -95,4 +95,13 @@ public interface ChannelProvider {
 	 * @return {@code true} if the channel is connected
 	 */
 	public boolean isAvailable();
+
+
+	/**
+	 * Returns the {@link SelectionKey} of this {@code ChannelProvider}.
+	 * 
+	 * @return The {@code SelectionKey}
+	 * @since 1.7
+	 */
+	public SelectionKey getSelectionKey();
 }

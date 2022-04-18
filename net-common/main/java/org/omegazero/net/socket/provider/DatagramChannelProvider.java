@@ -156,6 +156,12 @@ public class DatagramChannelProvider implements ChannelProvider {
 	}
 
 
+	@Override
+	public SelectionKey getSelectionKey() {
+		return this.selectionKey;
+	}
+
+
 	private synchronized void enableOp(int op) {
 		int ops = this.selectionKey.interestOps();
 		if((ops & op) == 0){
