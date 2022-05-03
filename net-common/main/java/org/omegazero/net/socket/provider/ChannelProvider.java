@@ -101,7 +101,7 @@ public interface ChannelProvider {
 	 * Returns the {@link SelectionKey} of this {@code ChannelProvider}.
 	 * 
 	 * @return The {@code SelectionKey}
-	 * @since 1.7
+	 * @since 1.6.1
 	 */
 	public SelectionKey getSelectionKey();
 }
