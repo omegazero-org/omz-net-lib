@@ -18,6 +18,7 @@ steps:
   commands:
   - mkdir build
   - setversion net-common/main/java/org/omegazero/net/common/NetCommon.java
+  - curl -G "https://omegazero.org/site/software/r/license_bin_full.php" --data-urlencode "srcurl=$DRONE_REPO_LINK/src/commit/$DRONE_COMMIT" > LICENSE_BIN
 
 - name: build-common
   # use ECJ because of bug in default JDK 8 compiler (JDK-8139836)
@@ -25,7 +26,8 @@ steps:
   image: openjdk-ecj:4.14
   pull: never
   commands:
-  - mkdir -p build/common/bin
+  - mkdir -p build/common/bin/META-INF
+  - cp LICENSE_BIN build/common/bin/META-INF/LICENSE
   - ecj -verbose -d build/common/bin -cp omz-common-latest.jar -8 net-common/main/java
   - jar cf build-common.jar -C build/common/bin .
   depends_on:
@@ -36,7 +38,8 @@ steps:
   image: openjdk-ecj:4.14
   pull: never
   commands:
-  - mkdir -p build/nio-common/bin
+  - mkdir -p build/nio-common/bin/META-INF
+  - cp LICENSE_BIN build/nio-common/bin/META-INF/LICENSE
   - ecj -verbose -d build/nio-common/bin -cp omz-common-latest.jar:build-common.jar -8 nio-common/main/java
   - jar cf build-nio-common.jar -C build/nio-common/bin .
   depends_on:
@@ -46,7 +49,8 @@ steps:
   image: openjdk-ecj:4.14
   pull: never
   commands:
-  - mkdir -p build/nio-client/bin
+  - mkdir -p build/nio-client/bin/META-INF
+  - cp LICENSE_BIN build/nio-client/bin/META-INF/LICENSE
   - ecj -verbose -d build/nio-client/bin -cp omz-common-latest.jar:build-common.jar:build-nio-common.jar -8 nio-client/main/java
   - jar cf build-nio-client.jar -C build/nio-client/bin .
   depends_on:
@@ -57,7 +61,8 @@ steps:
   image: openjdk-ecj:4.14
   pull: never
   commands:
-  - mkdir -p build/nio-server/bin
+  - mkdir -p build/nio-server/bin/META-INF
+  - cp LICENSE_BIN build/nio-server/bin/META-INF/LICENSE
   - ecj -verbose -d build/nio-server/bin -cp omz-common-latest.jar:build-common.jar:build-nio-common.jar -8 nio-server/main/java
   - jar cf build-nio-server.jar -C build/nio-server/bin .
   depends_on:
@@ -68,8 +73,9 @@ steps:
   image: openjdk-ecj:4.14
   pull: never
   commands:
-  - mkdir -p build/nio-all/bin
+  - mkdir -p build/nio-all/bin/META-INF
   - cp -r build/common/bin/* build/nio-common/bin/* build/nio-client/bin/* build/nio-server/bin/* build/nio-all/bin
+  - cp LICENSE_BIN build/nio-all/bin/META-INF/LICENSE
   - jar cf build-nio-all.jar -C build/nio-all/bin .
   depends_on:
   - build-common
