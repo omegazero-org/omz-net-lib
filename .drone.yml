@@ -10,7 +10,6 @@ steps:
   image: omz-ci-tools
   pull: never
   commands:
-  - artifact-dl-java maven/org.json:json:20211205
   - artifact-dl-java omz/org.omegazero.common:omz-common:latest
 
 - name: prepare-source
@@ -27,58 +26,68 @@ steps:
   pull: never
   commands:
   - mkdir -p build/common/bin
-  - ecj -verbose -d build/common/bin -cp json-20211205.jar:omz-common-latest.jar -8 net-common/main/java
+  - ecj -verbose -d build/common/bin -cp omz-common-latest.jar -8 net-common/main/java
   - jar cf build-common.jar -C build/common/bin .
   depends_on:
   - prepare-dependencies
   - prepare-source
 
-- name: build-client
+- name: build-nio-common
   image: openjdk-ecj:4.14
   pull: never
   commands:
-  - mkdir -p build/client/bin
-  - ecj -verbose -d build/client/bin -cp json-20211205.jar:omz-common-latest.jar:build-common.jar -8 net-client/main/java
-  - jar cf build-client.jar -C build/client/bin .
+  - mkdir -p build/nio-common/bin
+  - ecj -verbose -d build/nio-common/bin -cp omz-common-latest.jar:build-common.jar -8 nio-common/main/java
+  - jar cf build-nio-common.jar -C build/nio-common/bin .
   depends_on:
-  - prepare-dependencies
-  - prepare-source
   - build-common
 
-- name: build-server
+- name: build-nio-client
   image: openjdk-ecj:4.14
   pull: never
   commands:
-  - mkdir -p build/server/bin
-  - ecj -verbose -d build/server/bin -cp json-20211205.jar:omz-common-latest.jar:build-common.jar -8 net-server/main/java
-  - jar cf build-server.jar -C build/server/bin .
+  - mkdir -p build/nio-client/bin
+  - ecj -verbose -d build/nio-client/bin -cp omz-common-latest.jar:build-common.jar:build-nio-common.jar -8 nio-client/main/java
+  - jar cf build-nio-client.jar -C build/nio-client/bin .
   depends_on:
-  - prepare-dependencies
-  - prepare-source
   - build-common
+  - build-nio-common
 
-- name: build-all
+- name: build-nio-server
   image: openjdk-ecj:4.14
   pull: never
   commands:
-  - mkdir -p build/all/bin
-  - cp -r build/common/bin/* build/client/bin/* build/server/bin/* build/all/bin
-  - jar cf build-all.jar -C build/all/bin .
+  - mkdir -p build/nio-server/bin
+  - ecj -verbose -d build/nio-server/bin -cp omz-common-latest.jar:build-common.jar:build-nio-common.jar -8 nio-server/main/java
+  - jar cf build-nio-server.jar -C build/nio-server/bin .
   depends_on:
   - build-common
-  - build-client
-  - build-server
+  - build-nio-common
+
+- name: build-nio-all
+  image: openjdk-ecj:4.14
+  pull: never
+  commands:
+  - mkdir -p build/nio-all/bin
+  - cp -r build/common/bin/* build/nio-common/bin/* build/nio-client/bin/* build/nio-server/bin/* build/nio-all/bin
+  - jar cf build-nio-all.jar -C build/nio-all/bin .
+  depends_on:
+  - build-common
+  - build-nio-common
+  - build-nio-client
+  - build-nio-server
 
 - name: publish
   image: omz-ci-tools
   pull: never
   commands:
-  - artifact-push-java build-all.jar omz/org.omegazero.net:omz-netlib
   - artifact-push-java build-common.jar omz/org.omegazero.net:omz-netlib-common
-  - artifact-push-java build-client.jar omz/org.omegazero.net:omz-netlib-client
-  - artifact-push-java build-server.jar omz/org.omegazero.net:omz-netlib-server
+  - artifact-push-java build-nio-common.jar omz/org.omegazero.net:omz-netlib-nio-common
+  - artifact-push-java build-nio-client.jar omz/org.omegazero.net:omz-netlib-nio-client
+  - artifact-push-java build-nio-server.jar omz/org.omegazero.net:omz-netlib-nio-server
+  - artifact-push-java build-nio-all.jar omz/org.omegazero.net:omz-netlib-nio
   depends_on:
-  - build-all
+  - build-nio-all
   environment:
     OMZ_ARTIFACT_PUSH_TOKEN:
       from_secret: artifact_push_token

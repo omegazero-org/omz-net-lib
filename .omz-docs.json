@@ -1,28 +1,37 @@
 {
 	"generator": "javadoc",
-	"targetName": "omz-net-lib",
+	"targetName": "omz-net-lib-v2",
 	"generatorOptions": {
 		"src": [
 			"net-common/main/java",
-			"net-client/main/java",
-			"net-server/main/java"
+			"nio-common/main/java",
+			"nio-client/main/java",
+			"nio-server/main/java"
 		],
 		"packages": ["org"],
-		"windowtitle": "omegazero Java Network Library",
-		"doctitle": "omegazero Java Network Library documentation",
-		"header": "omz net lib",
+		"windowtitle": "omegazero Java Networking Library",
+		"doctitle": "omegazero Java Networking Library documentation",
+		"header": "omz net lib v2",
 		"groups": {
-			"Lib: common": "org.omegazero.net.common:org.omegazero.net.socket:org.omegazero.net.socket.*:org.omegazero.net.util",
-			"Lib: client": "org.omegazero.net.client:org.omegazero.net.client.*",
-			"Lib: server": "org.omegazero.net.server:org.omegazero.net.server.*"
+			"Base packages": [
+				"org.omegazero.net.common",
+				"org.omegazero.net.client",
+				"org.omegazero.net.client.*",
+				"org.omegazero.net.server",
+				"org.omegazero.net.server.*",
+				"org.omegazero.net.socket",
+				"org.omegazero.net.util"
+			],
+			"Implementation: nio": [
+				"org.omegazero.net.nio",
+				"org.omegazero.net.nio.*"
+			]
 		},
 		"links": [
 			"https://docs.oracle.com/javase/8/docs/api/",
-			"https://stleary.github.io/JSON-java/",
 			"https://docs.omegazero.org/javadoc/omz-java-lib/"
 		],
 		"dependencies": [
-			"maven/org.json:json:20211205",
 			"omz/org.omegazero.common:omz-common:latest"
 		]
 	}
