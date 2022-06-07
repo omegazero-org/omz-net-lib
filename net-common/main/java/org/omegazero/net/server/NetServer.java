@@ -16,12 +16,19 @@ import java.util.function.Consumer;
 import org.omegazero.net.common.NetworkApplication;
 import org.omegazero.net.socket.SocketConnection;
 
+/**
+ * Represents an application accepting {@link SocketConnection}s from clients.
+ * <p>
+ * To accept connections, {@link #setConnectionCallback(Consumer)} must be called.
+ */
 public interface NetServer extends NetworkApplication {
 
 	/**
-	 * Sets the callback for a new incoming request.<br>
-	 * <br>
+	 * Sets the callback for a new incoming connection.
+	 * <p>
 	 * The first parameter of this callback is an {@link SocketConnection} instance representing the new connection from the client.
+	 * <p>
+	 * This method must be called before {@link #start()}, otherwise, behavior is undefined.
 	 * 
 	 * @param handler The connection callback
 	 */

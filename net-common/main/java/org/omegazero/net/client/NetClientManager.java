@@ -17,16 +17,22 @@ import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.common.NetworkApplication;
 import org.omegazero.net.socket.SocketConnection;
 
+/**
+ * Represents a client connection manager. This application is responsible for managing any number of outgoing connections to a remote server.
+ * <p>
+ * Outgoing connections are created using {@link #connection(ConnectionParameters)}.
+ */
 public interface NetClientManager extends NetworkApplication {
 
 	/**
-	 * Creates a new connection instance based on the given parameters to be managed by this <code>NetClientManager</code>.<br>
-	 * <br>
+	 * Creates a new connection instance based on the given parameters to be managed by this <code>NetClientManager</code>.
+	 * <p>
 	 * {@link SocketConnection#connect(int)} will need to be called on the returned connection instance to initiate the connection.
 	 * 
 	 * @param params Parameters for this connection
 	 * @return The new connection instance
-	 * @throws IOException
+	 * @throws IOException If an error occurs while creating the connection. Subsequent network errors (for example, because the server refused the connection) are usually passed
+	 * to the {@code onError} callback of the new connection instead
 	 */
 	public SocketConnection connection(ConnectionParameters params) throws IOException;
 }

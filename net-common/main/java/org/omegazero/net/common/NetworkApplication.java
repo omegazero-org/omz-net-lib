@@ -12,7 +12,11 @@
 package org.omegazero.net.common;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 
+/**
+ * Represents any networking application (for example, a client or server).
+ */
 public interface NetworkApplication extends Runnable {
 
 	/**
@@ -30,30 +34,29 @@ public interface NetworkApplication extends Runnable {
 	public void close() throws IOException;
 
 	/**
-	 * Runs the main loop of this instance. This loop processes incoming or outgoing connection requests and network traffic.<br>
-	 * <br>
-	 * Under normal circumstances, should never return before {@link #close()} is called. After <code>close()</code> is called, this function should return as soon as
-	 * possible.<br>
-	 * <br>
+	 * Runs the main loop of this instance. This loop processes incoming or outgoing connection requests and network traffic.
+	 * <p>
+	 * Under normal circumstances, never returns before {@link #close()} is called. After {@code close()} is called, this function should return as soon as possible.
+	 * <p>
 	 * If this method is called before {@link #init()}, the behavior is undefined.
 	 * 
-	 * @throws IOException If an IO error occurs during any networking operation
+	 * @throws IOException If a fatal IO error occurs during any networking operation
 	 */
 	public void start() throws IOException;
 
 
 	/**
-	 * Method which implements the {@link Runnable#run()} function.<br>
-	 * <br>
-	 * This method is equivalent to {@link #start()}, except that any <code>IOException</code>s thrown are wrapped into a <code>RuntimeException</code>. An application using
-	 * this instance may want to use {@link #start()} instead, to properly handle errors.
+	 * Method which implements the {@link Runnable#run()} function.
+	 * <p>
+	 * This method is equivalent to {@link #start()}, except that any <code>IOException</code>s thrown are wrapped into an <code>UncheckedIOException</code>. An application using
+	 * this instance should use {@link #start()} instead, to properly handle errors.
 	 */
 	@Override
-	default void run() {
+	public default void run() {
 		try{
 			this.start();
 		}catch(IOException e){
-			throw new RuntimeException("Error in " + this.getClass().getName() + " main loop", e);
+			throw new UncheckedIOException("Error in " + this.getClass().getName() + " main loop", e);
 		}
 	}
 }
