@@ -9,8 +9,8 @@ package org.omegazero.net.socket;
 import java.net.SocketAddress;
 import java.util.function.Consumer;
 
-import org.omegazero.net.common.ThrowingConsumer;
-import org.omegazero.net.common.ThrowingRunnable;
+import org.omegazero.common.util.function.ThrowingConsumer;
+import org.omegazero.common.util.function.ThrowingRunnable;
 
 /**
  * Represents any type of connection between the local and a remote host.

@@ -23,7 +23,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Deque;
 import java.util.LinkedList;
 
-import org.omegazero.net.common.ThrowingRunnable;
+import org.omegazero.common.util.function.ThrowingRunnable;
 import org.omegazero.net.nio.socket.provider.ChannelProvider;
 import org.omegazero.net.socket.AbstractSocketConnection;
 

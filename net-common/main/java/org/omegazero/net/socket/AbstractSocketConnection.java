@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import org.omegazero.common.util.SimpleAttachmentContainer;
-import org.omegazero.net.common.ThrowingConsumer;
-import org.omegazero.net.common.ThrowingRunnable;
+import org.omegazero.common.util.function.ThrowingConsumer;
+import org.omegazero.common.util.function.ThrowingRunnable;
 import org.omegazero.net.common.UnhandledException;
 
 /**
