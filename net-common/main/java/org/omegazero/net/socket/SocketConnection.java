@@ -159,13 +159,6 @@ public interface SocketConnection extends java.io.Closeable {
 	public abstract void destroy();
 
 	/**
-	 * Returns <code>true</code> if this socket is connected.
-	 * 
-	 * @return <code>true</code> if this socket is connected
-	 */
-	public abstract boolean isConnected();
-
-	/**
 	 * Returns the {@linkplain SocketAddress address} of the remote host.
 	 * 
 	 * @return The address of the peer host
@@ -185,6 +178,30 @@ public interface SocketConnection extends java.io.Closeable {
 	 * @return The last time any data was sent over this connection in milliseconds
 	 */
 	public abstract long getLastIOTime();
+
+	/**
+	 * Returns <code>true</code> if this socket is connected.
+	 * 
+	 * @return <code>true</code> if this socket is connected
+	 */
+	public abstract boolean isConnected();
+
+	/**
+	 * Returns <code>true</code> if the <i>onConnect</i> event has ever executed. This is already <code>true</code> while running the event.
+	 * 
+	 * @return <code>true</code> if the <i>onConnect</i> event has ever fired
+	 */
+	public abstract boolean hasConnected();
+
+	/**
+	 * Returns <code>true</code> if this socket {@linkplain #hasConnected() has connected} but is no longer {@linkplain #isConnected() connected}.
+	 * 
+	 * @return <code>true</code> if this socket has disconnected
+	 * @since 1.6
+	 */
+	public default boolean hasDisconnected() {
+		return this.hasConnected() && !this.isConnected();
+	}
 
 	/**
 	 * Returns <code>true</code> if this socket is writable, meaning data passed to {@link #write(byte[])} will not be buffered but written to the socket directly.

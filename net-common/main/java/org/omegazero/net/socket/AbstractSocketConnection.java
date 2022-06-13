@@ -50,6 +50,12 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 
 
 	@Override
+	public boolean hasConnected() {
+		return this.writeQueue == null; // writeQueue gets deleted in handleConnect/flushWriteQueue
+	}
+
+
+	@Override
 	public final void setApparentRemoteAddress(SocketAddress apparentRemoteAddress) {
 		this.apparentRemoteAddress = apparentRemoteAddress;
 	}
@@ -104,26 +110,6 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 		if(this.onLocalConnect != null)
 			throw new IllegalStateException("onLocalConnect is already set");
 		this.onLocalConnect = onLocalConnect;
-	}
-
-
-	/**
-	 * Returns <code>true</code> if the <i>onConnect</i> event has ever executed. This is already <code>true</code> while running the event.
-	 * 
-	 * @return <code>true</code> if the <i>onConnect</i> event has ever fired
-	 */
-	public boolean hasConnected() {
-		return this.writeQueue == null; // writeQueue gets deleted in handleConnect/flushWriteQueue
-	}
-
-	/**
-	 * Returns <code>true</code> if this socket {@linkplain #hasConnected() has connected} but is no longer {@linkplain #isConnected() connected}.
-	 * 
-	 * @return <code>true</code> if this socket has disconnected
-	 * @since 1.6
-	 */
-	public boolean hasDisconnected() {
-		return this.hasConnected() && !this.isConnected();
 	}
 
 
@@ -262,7 +248,7 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	}
 
 	/**
-	 * Called by subclasses or classes managing this {@link SocketConnection} if this connection closed. This method calls the {@code onError} callback on the first invocation of
+	 * Called by subclasses or classes managing this {@link SocketConnection} if this connection closed. This method calls the {@code onClose} callback on the first invocation of
 	 * this method.
 	 * 
 	 * @see #setOnClose(ThrowingRunnable)
