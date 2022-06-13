@@ -35,8 +35,14 @@ import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.common.util.PropertyUtil;
 import org.omegazero.net.nio.socket.provider.ChannelProvider;
+import org.omegazero.net.socket.TLSConnection;
 
-public class TLSConnection extends ChannelConnection {
+/**
+ * A {@link ChannelConnection} with {@linkplain TLSConnection TLS} encryption. This implementation uses an {@link SSLEngine} from a given {@link SSLContext} for TLS support.
+ * 
+ * @apiNote Before version 2.1.0, this class was in package {@code org.omegazero.net.socket.impl} and called {@code TLSConnection}.
+ */
+public class NioTLSConnection extends ChannelConnection implements TLSConnection {
 
 	private static final Logger logger = LoggerUtil.createLogger();
 
@@ -52,13 +58,11 @@ public class TLSConnection extends ChannelConnection {
 
 	private boolean handshakeComplete = false;
 
-	private String alpnProtocol = null;
-
-	public TLSConnection(SelectionKey selectionKey, ChannelProvider provider, SSLContext sslContext, boolean client, String[] alpnNames) throws IOException {
+	public NioTLSConnection(SelectionKey selectionKey, ChannelProvider provider, SSLContext sslContext, boolean client, String[] alpnNames) throws IOException {
 		this(selectionKey, provider, null, sslContext, client, alpnNames, null);
 	}
 
-	public TLSConnection(SelectionKey selectionKey, ChannelProvider provider, SocketAddress remote, SSLContext sslContext, boolean client, String[] alpnNames,
+	public NioTLSConnection(SelectionKey selectionKey, ChannelProvider provider, SocketAddress remote, SSLContext sslContext, boolean client, String[] alpnNames,
 			String[] requestedServerNames) throws IOException {
 		super(selectionKey, provider, remote);
 		this.sslContext = sslContext;
@@ -74,7 +78,7 @@ public class TLSConnection extends ChannelConnection {
 			String[] protoList = this.sslEngine.getEnabledProtocols();
 			int ti = 0;
 			for(int i = 0; i < protoList.length; i++){
-				if(TLSConnection.isMinTLSVersion(protoList[i]))
+				if(isMinTLSVersion(protoList[i]))
 					protoList[ti++] = protoList[i];
 			}
 			if(ti < protoList.length){
@@ -89,7 +93,7 @@ public class TLSConnection extends ChannelConnection {
 			String[] cipherList = this.sslEngine.getEnabledCipherSuites();
 			int ti = 0;
 			for(int i = 0; i < cipherList.length; i++){
-				if(!TLSConnection.isWeakCipher(cipherList[i]))
+				if(!isWeakCipher(cipherList[i]))
 					cipherList[ti++] = cipherList[i];
 			}
 			if(ti < cipherList.length){
@@ -202,26 +206,38 @@ public class TLSConnection extends ChannelConnection {
 		super.close0();
 	}
 
-	/**
-	 * 
-	 * @return <code>true</code> if {@link ChannelConnection#isConnected()} returns <code>true</code> and the TLS handshake has completed
-	 */
 	@Override
 	public boolean isConnected() {
 		return super.isConnected() && this.handshakeComplete;
 	}
 
+	@Override
+	public boolean isSocketConnected() {
+		return super.isConnected();
+	}
 
-	/**
-	 * 
-	 * @return The negotiated ALPN protocol name, or <code>null</code> if ALPN did not occur
-	 */
-	public String getAlpnProtocol() {
-		// an empty string means that no ALPN happened (as specified by SSLEngine.getApplicationProtocol())
-		if(this.alpnProtocol == null || this.alpnProtocol.length() < 1)
+	@Override
+	public String getProtocol() {
+		return this.sslEngine.getSession().getProtocol();
+	}
+
+	@Override
+	public String getCipher() {
+		return this.sslEngine.getSession().getCipherSuite();
+	}
+
+	@Override
+	public String getApplicationProtocol() {
+		String proto;
+		try{
+			proto = this.sslEngine.getApplicationProtocol();
+		}catch(UnsupportedOperationException e){
+			return null;
+		}
+		if(proto == null || proto.length() < 1)
 			return null;
 		else
-			return this.alpnProtocol;
+			return proto;
 	}
 
 
@@ -325,9 +341,8 @@ public class TLSConnection extends ChannelConnection {
 				status = this.sslEngine.getHandshakeStatus();
 			}else if(status == HandshakeStatus.NOT_HANDSHAKING){
 				this.handshakeComplete = true;
-				this.alpnProtocol = this.sslEngine.getApplicationProtocol();
-				logger.debug("SSL Handshake completed: peer=" + super.getRemoteAddress() + ", cipher=" + this.sslEngine.getSession().getCipherSuite(), ", alp=",
-						this.getAlpnProtocol());
+				if(logger.debug())
+					logger.debug("SSL Handshake completed: peer=" + super.getRemoteAddress() + ", cipher=" + this.getCipher(), ", alp=", this.getApplicationProtocol());
 				super.handleConnect();
 				return;
 			}else

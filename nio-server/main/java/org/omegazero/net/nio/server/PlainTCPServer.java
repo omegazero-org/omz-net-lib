@@ -21,7 +21,7 @@ import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.nio.socket.ChannelConnection;
-import org.omegazero.net.nio.socket.PlainConnection;
+import org.omegazero.net.nio.socket.NioPlaintextConnection;
 import org.omegazero.net.nio.socket.provider.SocketChannelProvider;
 
 /**
@@ -53,7 +53,7 @@ public class PlainTCPServer extends TCPServer {
 
 	@Override
 	protected ChannelConnection handleConnection(SelectionKey selectionKey) throws IOException {
-		ChannelConnection conn = new PlainConnection(selectionKey, new SocketChannelProvider());
+		ChannelConnection conn = new NioPlaintextConnection(selectionKey, new SocketChannelProvider());
 
 		// this is to handle errors that happen before another error handler was set, for example because a TLS handshake error occurred
 		// and there was no way to set another error handler because the onConnect was not called yet

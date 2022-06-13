@@ -17,7 +17,7 @@ import java.util.function.Consumer;
 
 import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.nio.socket.ChannelConnection;
-import org.omegazero.net.nio.socket.PlainConnection;
+import org.omegazero.net.nio.socket.NioPlaintextConnection;
 import org.omegazero.net.nio.socket.provider.SocketChannelProvider;
 
 /**
@@ -38,7 +38,7 @@ public class PlainTCPClientManager extends TCPClientManager {
 
 	@Override
 	protected ChannelConnection createConnection(SelectionKey selectionKey, ConnectionParameters params) throws IOException {
-		return new PlainConnection(selectionKey, new SocketChannelProvider(), params.getRemote());
+		return new NioPlaintextConnection(selectionKey, new SocketChannelProvider(), params.getRemote());
 	}
 
 	@Override

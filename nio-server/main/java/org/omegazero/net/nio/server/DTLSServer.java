@@ -26,7 +26,7 @@ import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.nio.socket.ChannelConnection;
-import org.omegazero.net.nio.socket.TLSConnection;
+import org.omegazero.net.nio.socket.NioTLSConnection;
 import org.omegazero.net.nio.socket.provider.DatagramChannelProvider;
 
 /**
@@ -88,7 +88,7 @@ public class DTLSServer extends UDPServer {
 
 	@Override
 	protected ChannelConnection handleConnection(SelectionKey serverKey, SocketAddress remote) throws IOException {
-		ChannelConnection conn = new TLSConnection(serverKey, new DatagramChannelProvider(remote, super::writeBacklogStarted), remote, this.sslContext, false,
+		ChannelConnection conn = new NioTLSConnection(serverKey, new DatagramChannelProvider(remote, super::writeBacklogStarted), remote, this.sslContext, false,
 				this.supportedApplicationLayerProtocols, null);
 
 		conn.setOnError((e) -> {

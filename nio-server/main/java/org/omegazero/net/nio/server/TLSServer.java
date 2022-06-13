@@ -25,7 +25,7 @@ import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.nio.socket.ChannelConnection;
-import org.omegazero.net.nio.socket.TLSConnection;
+import org.omegazero.net.nio.socket.NioTLSConnection;
 import org.omegazero.net.nio.socket.provider.SocketChannelProvider;
 
 /**
@@ -86,7 +86,7 @@ public class TLSServer extends TCPServer {
 
 	@Override
 	protected ChannelConnection handleConnection(SelectionKey selectionKey) throws IOException {
-		ChannelConnection conn = new TLSConnection(selectionKey, new SocketChannelProvider(), this.sslContext, false, this.supportedApplicationLayerProtocols);
+		ChannelConnection conn = new NioTLSConnection(selectionKey, new SocketChannelProvider(), this.sslContext, false, this.supportedApplicationLayerProtocols);
 
 		// see note in PlainTCPServer
 		conn.setOnError((e) -> {

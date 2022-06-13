@@ -18,14 +18,19 @@ import java.nio.channels.SelectionKey;
 
 import org.omegazero.net.nio.socket.provider.ChannelProvider;
 
-public class PlainConnection extends ChannelConnection {
+/**
+ * A {@link ChannelConnection} with no encryption.
+ * 
+ * @apiNote Before version 2.1.0, this class was in package {@code org.omegazero.net.socket.impl} and called {@code PlainConnection}.
+ */
+public class NioPlaintextConnection extends ChannelConnection {
 
 
-	public PlainConnection(SelectionKey selectionKey, ChannelProvider provider) throws IOException {
+	public NioPlaintextConnection(SelectionKey selectionKey, ChannelProvider provider) throws IOException {
 		this(selectionKey, provider, null);
 	}
 
-	public PlainConnection(SelectionKey selectionKey, ChannelProvider provider, SocketAddress remote) throws IOException {
+	public NioPlaintextConnection(SelectionKey selectionKey, ChannelProvider provider, SocketAddress remote) throws IOException {
 		super(selectionKey, provider, remote);
 
 		this.createBuffers();

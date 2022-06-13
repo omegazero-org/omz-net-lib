@@ -24,7 +24,7 @@ import javax.net.ssl.TrustManager;
 import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.client.params.TLSConnectionParameters;
 import org.omegazero.net.nio.socket.ChannelConnection;
-import org.omegazero.net.nio.socket.TLSConnection;
+import org.omegazero.net.nio.socket.NioTLSConnection;
 import org.omegazero.net.nio.socket.provider.SocketChannelProvider;
 import org.omegazero.net.util.TrustManagerUtil;
 
@@ -69,7 +69,7 @@ public class TLSClientManager extends TCPClientManager {
 
 			SSLContext context = SSLContext.getInstance("TLS");
 			context.init(null, this.trustManagers, null);
-			return new TLSConnection(selectionKey, new SocketChannelProvider(), params.getRemote(), context, true, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
+			return new NioTLSConnection(selectionKey, new SocketChannelProvider(), params.getRemote(), context, true, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
 		}catch(GeneralSecurityException | IOException e){
 			throw new RuntimeException("Error while creating TLS client connection", e);
 		}
@@ -78,7 +78,7 @@ public class TLSClientManager extends TCPClientManager {
 	@Override
 	protected void handleConnect(ChannelConnection conn) {
 		try{
-			((TLSConnection) conn).doTLSHandshake();
+			((NioTLSConnection) conn).doTLSHandshake();
 		}catch(Exception e){
 			conn.handleError(e);
 		}
