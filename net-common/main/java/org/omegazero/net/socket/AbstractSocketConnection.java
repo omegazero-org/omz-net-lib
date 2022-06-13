@@ -9,12 +9,14 @@ package org.omegazero.net.socket;
 import java.net.SocketAddress;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 import org.omegazero.common.util.SimpleAttachmentContainer;
 import org.omegazero.common.util.function.ThrowingConsumer;
 import org.omegazero.common.util.function.ThrowingRunnable;
 import org.omegazero.net.common.UnhandledException;
+import org.omegazero.net.util.SyncWorker;
 
 /**
  * A {@link SocketConnection} containing implementations for several interface methods and utility methods.
@@ -34,6 +36,8 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	private Consumer<AbstractSocketConnection> onLocalClose;
 
 	private SocketAddress apparentRemoteAddress;
+
+	private Consumer<Runnable> worker = new SyncWorker();
 
 	private List<byte[]> writeQueue = new LinkedList<>();
 
@@ -114,6 +118,52 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 
 
 	/**
+	 * Returns the worker for this {@code AbstractSocketConnection}.
+	 * 
+	 * @return The worker
+	 * @see #setWorker(Consumer)
+	 */
+	public Consumer<Runnable> getWorker() {
+		return this.worker;
+	}
+
+	/**
+	 * Sets the worker for this {@code AbstractSocketConnection}. This worker is used to run all callbacks except {@code onError} and may be used to run the callbacks in a
+	 * different thread.
+	 * <p>
+	 * The worker must execute all tasks in the order they were given and should not execute tasks concurrently.
+	 * <p>
+	 * The default worker is {@link SyncWorker}.
+	 * 
+	 * @param worker The worker
+	 */
+	public void setWorker(Consumer<Runnable> worker) {
+		this.worker = Objects.requireNonNull(worker);
+	}
+
+
+	/**
+	 * Returns the read lock. This object is locked every time a read operation that changes the internal state of the connection is performed.
+	 * 
+	 * @return The read lock
+	 * @since 1.4
+	 */
+	public final Object getReadLock() {
+		return this.readLock;
+	}
+
+	/**
+	 * Returns the write lock. This object is locked every time a write operation that changes the internal state of the connection is performed.
+	 * 
+	 * @return The write lock
+	 * @since 1.4
+	 */
+	public final Object getWriteLock() {
+		return this.writeLock;
+	}
+
+
+	/**
 	 * Called by implementing classes if this connection was established immediately upon calling {@link #connect(int)}. May be used internally by the connection manager.
 	 */
 	protected final void localConnect() {
@@ -154,47 +204,12 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	}
 
 
-	/**
-	 * Returns the read lock. This object is locked every time a read operation that changes the internal state of the connection is performed.
-	 * 
-	 * @return The read lock
-	 * @since 1.4
-	 */
-	public final Object getReadLock() {
-		return this.readLock;
-	}
-
-	/**
-	 * Returns the write lock. This object is locked every time a write operation that changes the internal state of the connection is performed.
-	 * 
-	 * @return The write lock
-	 * @since 1.4
-	 */
-	public final Object getWriteLock() {
-		return this.writeLock;
-	}
-
-
 	public final void handleConnect() {
-		try{
-			this.flushWriteQueue();
-			if(this.onConnect != null)
-				this.onConnect.run();
-			if(this.isWritable())
-				this.handleWritable();
-		}catch(Exception e){
-			this.handleError(e);
-		}
+		this.runAsync(this::runOnConnect);
 	}
 
 	public final void handleTimeout() {
-		try{
-			if(this.onTimeout != null)
-				this.onTimeout.run();
-			this.destroy();
-		}catch(Exception e){
-			this.handleError(e);
-		}
+		this.runAsync(this::runOnTimeout);
 	}
 
 	/**
@@ -207,11 +222,7 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	public final boolean handleData(byte[] data) {
 		if(this.onData == null)
 			return false;
-		try{
-			this.onData.accept(data);
-		}catch(Exception e){
-			this.handleError(e);
-		}
+		this.runAsync(this::runOnData, data);
 		return true;
 	}
 
@@ -221,30 +232,7 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	 * @see #setOnWritable(ThrowingRunnable)
 	 */
 	public final void handleWritable() {
-		try{
-			// onWritable can happen before onConnect, for example when flushing the write backlog, but that should be suppressed
-			// this is called anyway in handleConnect if socket is writable
-			if(this.hasConnected() && this.onWritable != null)
-				this.onWritable.run();
-		}catch(Exception e){
-			this.handleError(e);
-		}
-	}
-
-	/**
-	 * Called by subclasses or classes managing this {@link SocketConnection} if an error occurred in a callback. This method calls the {@code onError} callback and
-	 * {@linkplain #destroy() forcibly closes} this connection.
-	 * 
-	 * @param e The error
-	 * @throws UnhandledException If no {@code onError} handler is set
-	 * @see #setOnError(Consumer)
-	 */
-	public final void handleError(Throwable e) {
-		if(this.onError != null){
-			this.onError.accept(e);
-			this.destroy();
-		}else
-			throw new UnhandledException(e);
+		this.runAsync(this::runOnWritable);
 	}
 
 	/**
@@ -254,14 +242,85 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	 * @see #setOnClose(ThrowingRunnable)
 	 */
 	public final void handleClose() {
-		if(this.closed)
-			return;
-		this.closed = true;
-		try{
-			if(this.onClose != null)
-				this.onClose.run();
-		}catch(Exception e){
-			this.handleError(e);
+		synchronized(this){
+			if(this.closed)
+				return;
+			this.closed = true;
 		}
+		this.runAsync(this::runOnClose);
+	}
+
+
+	/**
+	 * Called by subclasses or classes managing this {@link SocketConnection} if an error occurred in a callback. This method calls the {@code onError} callback and
+	 * {@linkplain #destroy() forcibly closes} this connection.
+	 * <p>
+	 * Unlike the other {@code handle} methods, this method always runs synchronously.
+	 * 
+	 * @param e The error
+	 * @throws UnhandledException If no {@code onError} handler is set
+	 * @see #setOnError(Consumer)
+	 */
+	public final void handleError(Throwable e) {
+		try{
+			if(this.onError != null){
+				this.onError.accept(e);
+			}else
+				throw new UnhandledException(e);
+		}finally{
+			this.destroy();
+		}
+	}
+
+
+	private void runOnConnect() throws Exception {
+		this.flushWriteQueue();
+		if(this.onConnect != null)
+			this.onConnect.run();
+		if(this.isWritable())
+			this.runOnWritable();
+	}
+
+	private void runOnTimeout() throws Exception {
+		if(this.onTimeout != null)
+			this.onTimeout.run();
+		this.destroy();
+	}
+
+	private void runOnData(byte[] data) throws Exception { // only called when onData is set
+		this.onData.accept(data);
+	}
+
+	private void runOnWritable() throws Exception {
+		// onWritable can happen before onConnect, for example when flushing the write backlog, but that should be suppressed
+		// this is called anyway in handleConnect if socket is writable
+		if(this.hasConnected() && this.onWritable != null)
+			this.onWritable.run();
+	}
+
+	private void runOnClose() throws Exception {
+		if(this.onClose != null)
+			this.onClose.run();
+	}
+
+
+	protected final void runAsync(ThrowingRunnable runnable) {
+		this.worker.accept(() -> {
+			try{
+				runnable.run();
+			}catch(Exception e){
+				this.handleError(e);
+			}
+		});
+	}
+
+	protected final <T> void runAsync(ThrowingConsumer<T> runnable, T value) {
+		this.worker.accept(() -> {
+			try{
+				runnable.accept(value);
+			}catch(Exception e){
+				this.handleError(e);
+			}
+		});
 	}
 }
