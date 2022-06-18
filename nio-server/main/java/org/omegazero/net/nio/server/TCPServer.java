@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.omegazero.common.event.Tasks;
 import org.omegazero.common.logging.Logger;
@@ -33,7 +34,6 @@ import org.omegazero.net.nio.util.ConnectionSelectorHandler;
 import org.omegazero.net.server.NetServer;
 import org.omegazero.net.socket.AbstractSocketConnection;
 import org.omegazero.net.socket.SocketConnection;
-import org.omegazero.net.util.SyncWorker;
 
 /**
  * TCP/IP implementation of a {@link NetServer}.
@@ -55,7 +55,7 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 	protected final Collection<InetAddress> bindAddresses;
 	protected final Collection<Integer> ports;
 	protected final int backlog;
-	protected final Consumer<Runnable> worker;
+	protected final Function<SocketConnection, Consumer<Runnable>> workerCreator;
 
 	private long idleTimeout;
 
@@ -63,16 +63,8 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 	private final Set<ChannelConnection> connections = new java.util.HashSet<>();
 
 	/**
-	 * 
-	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
-	 */
-	public TCPServer(Collection<Integer> ports) {
-		this(null, ports, 0, null, 0);
-	}
-
-	/**
-	 * Constructs a new <code>TCPServer</code> instance.<br>
-	 * <br>
+	 * Constructs a new <code>TCPServer</code> instance.
+	 * <p>
 	 * To initialize the server, {@link NetServer#init()} of this object must be called. After the call succeeded, the server will listen on the specified local address
 	 * (<b>bindAddress</b>) on the given <b>ports</b> and {@link NetServer#start()} must be called to start processing incoming connection requests and data.
 	 * 
@@ -80,21 +72,18 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 	 * automatically assigned address
 	 * @param ports The list of ports to listen on
 	 * @param backlog The maximum number of pending connections (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)}). May be 0 to use a default value
-	 * @param worker A callback accepting tasks to run that may require increased processing time. May be <code>null</code> to run everything using a single thread
+	 * @param workerCreator The worker creator
 	 * @param idleTimeout The time in milliseconds to keep connections that had no traffic. May be 0 to disable closing idle connections
 	 */
-	public TCPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout) {
+	public TCPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, int backlog, Function<SocketConnection, Consumer<Runnable>> workerCreator,
+			long idleTimeout) {
 		if(bindAddresses != null)
 			this.bindAddresses = bindAddresses;
 		else
 			this.bindAddresses = Arrays.asList((InetAddress) null);
 		this.ports = Objects.requireNonNull(ports, "ports must not be null");
 		this.backlog = backlog;
-		if(worker != null)
-			this.worker = worker;
-		else
-			this.worker = new SyncWorker();
-
+		this.workerCreator = workerCreator;
 		this.idleTimeout = idleTimeout;
 	}
 
@@ -199,6 +188,9 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 
 			conn.setOnLocalClose(super::onConnectionClosed);
 
+			if(this.workerCreator != null)
+				conn.setWorker(this.workerCreator.apply(conn));
+
 			conn.setOnConnect(() -> {
 				if(TCPServer.this.onNewConnection != null){
 					TCPServer.this.onNewConnection.accept(conn);
@@ -215,9 +207,7 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 			ChannelConnection conn = (ChannelConnection) key.attachment();
 			byte[] data = conn.read();
 			if(data != null){
-				this.worker.accept(() -> {
-					conn.handleData(data);
-				});
+				conn.handleData(data);
 			}
 		}else if(key.isWritable()){
 			ChannelConnection conn = (ChannelConnection) key.attachment();

@@ -14,11 +14,13 @@ package org.omegazero.net.nio.client;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.nio.socket.ChannelConnection;
 import org.omegazero.net.nio.socket.NioPlaintextConnection;
 import org.omegazero.net.nio.socket.provider.DatagramChannelProvider;
+import org.omegazero.net.socket.SocketConnection;
 
 /**
  * {@link UDPClientManager} implementation for plaintext TCP sockets.
@@ -27,11 +29,7 @@ import org.omegazero.net.nio.socket.provider.DatagramChannelProvider;
  */
 public class PlainUDPClientManager extends UDPClientManager {
 
-	public PlainUDPClientManager() {
-		super();
-	}
-
-	public PlainUDPClientManager(Consumer<Runnable> worker) {
+	public PlainUDPClientManager(Function<SocketConnection, Consumer<Runnable>> worker) {
 		super(worker);
 	}
 

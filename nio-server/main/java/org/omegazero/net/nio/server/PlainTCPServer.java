@@ -16,6 +16,7 @@ import java.net.InetAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Collection;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
@@ -23,6 +24,7 @@ import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.nio.socket.ChannelConnection;
 import org.omegazero.net.nio.socket.NioPlaintextConnection;
 import org.omegazero.net.nio.socket.provider.SocketChannelProvider;
+import org.omegazero.net.socket.SocketConnection;
 
 /**
  * {@link TCPServer} implementation for plaintext TCP sockets.
@@ -33,21 +35,13 @@ public class PlainTCPServer extends TCPServer {
 
 	private static final Logger logger = LoggerUtil.createLogger();
 
-
 	/**
 	 * 
 	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
 	 */
-	public PlainTCPServer(Collection<Integer> ports) {
-		super(ports);
-	}
-
-	/**
-	 * 
-	 * @see TCPServer#TCPServer(String, Collection, int, Consumer, long)
-	 */
-	public PlainTCPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, int backlog, Consumer<Runnable> worker, long idleTimeout) {
-		super(bindAddresses, ports, backlog, worker, idleTimeout);
+	public PlainTCPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, int backlog, Function<SocketConnection, Consumer<Runnable>> workerCreator,
+			long idleTimeout) {
+		super(bindAddresses, ports, backlog, workerCreator, idleTimeout);
 	}
 
 
@@ -69,6 +63,7 @@ public class PlainTCPServer extends TCPServer {
 
 	@Override
 	protected void handleConnectionPost(ChannelConnection connection) {
+		super.handleConnectionPost(connection);
 		connection.handleConnect(); // plain connections have no additional handshake and are considered connected immediately
 	}
 }

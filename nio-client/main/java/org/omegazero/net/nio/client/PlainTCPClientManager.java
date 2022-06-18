@@ -14,11 +14,13 @@ package org.omegazero.net.nio.client;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.nio.socket.ChannelConnection;
 import org.omegazero.net.nio.socket.NioPlaintextConnection;
 import org.omegazero.net.nio.socket.provider.SocketChannelProvider;
+import org.omegazero.net.socket.SocketConnection;
 
 /**
  * {@link TCPClientManager} implementation for plaintext TCP sockets.
@@ -27,11 +29,7 @@ import org.omegazero.net.nio.socket.provider.SocketChannelProvider;
  */
 public class PlainTCPClientManager extends TCPClientManager {
 
-	public PlainTCPClientManager() {
-		super();
-	}
-
-	public PlainTCPClientManager(Consumer<Runnable> worker) {
+	public PlainTCPClientManager(Function<SocketConnection, Consumer<Runnable>> worker) {
 		super(worker);
 	}
 

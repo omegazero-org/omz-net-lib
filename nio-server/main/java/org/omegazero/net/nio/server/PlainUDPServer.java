@@ -17,6 +17,7 @@ import java.net.SocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Collection;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
@@ -24,6 +25,7 @@ import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.nio.socket.ChannelConnection;
 import org.omegazero.net.nio.socket.NioPlaintextConnection;
 import org.omegazero.net.nio.socket.provider.DatagramChannelProvider;
+import org.omegazero.net.socket.SocketConnection;
 
 /**
  * {@link UDPServer} implementation for plaintext UDP sockets.
@@ -34,21 +36,13 @@ public class PlainUDPServer extends UDPServer {
 
 	private static final Logger logger = LoggerUtil.createLogger();
 
-
 	/**
 	 * 
 	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
 	 */
-	public PlainUDPServer(Collection<Integer> ports) {
-		super(ports);
-	}
-
-	/**
-	 * 
-	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
-	 */
-	public PlainUDPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize) {
-		super(bindAddresses, ports, worker, idleTimeout, receiveBufferSize);
+	public PlainUDPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, Function<SocketConnection, Consumer<Runnable>> workerCreator, long idleTimeout,
+			int receiveBufferSize) {
+		super(bindAddresses, ports, workerCreator, idleTimeout, receiveBufferSize);
 	}
 
 
@@ -67,6 +61,7 @@ public class PlainUDPServer extends UDPServer {
 
 	@Override
 	protected void handleConnectionPost(ChannelConnection connection) {
+		super.handleConnectionPost(connection);
 		connection.handleConnect();
 	}
 }

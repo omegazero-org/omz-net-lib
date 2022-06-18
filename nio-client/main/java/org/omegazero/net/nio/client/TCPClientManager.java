@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
@@ -27,7 +28,6 @@ import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.nio.socket.ChannelConnection;
 import org.omegazero.net.nio.util.ConnectionSelectorHandler;
 import org.omegazero.net.socket.SocketConnection;
-import org.omegazero.net.util.SyncWorker;
 
 /**
  * TCP/IP implementation of a {@link NetClientManager}.
@@ -43,17 +43,10 @@ public abstract class TCPClientManager extends ConnectionSelectorHandler impleme
 	// (ie called by the selectorLoop() thread, asynchronously), this exists for similar reasons why closedConnections in ConnectionSelectorHandler exists. This is a mess, i know.
 	private HashSet<SelectionKey> completedConnections = new HashSet<>();
 
-	protected final Consumer<Runnable> worker;
+	protected final Function<SocketConnection, Consumer<Runnable>> workerCreator;
 
-	public TCPClientManager() {
-		this(null);
-	}
-
-	public TCPClientManager(Consumer<Runnable> worker) {
-		if(worker != null)
-			this.worker = worker;
-		else
-			this.worker = new SyncWorker();
+	public TCPClientManager(Function<SocketConnection, Consumer<Runnable>> workerCreator) {
+		this.workerCreator = workerCreator;
 	}
 
 
@@ -67,7 +60,7 @@ public abstract class TCPClientManager extends ConnectionSelectorHandler impleme
 	protected abstract void handleConnect(ChannelConnection conn);
 
 
-	private void finishConnect(SelectionKey key) throws IOException {
+	private void finishConnect(SelectionKey key) {
 		synchronized(key){
 			if(!key.isValid())
 				return;
@@ -102,6 +95,9 @@ public abstract class TCPClientManager extends ConnectionSelectorHandler impleme
 		key.attach(conn);
 
 		conn.setOnLocalClose(super::onConnectionClosed);
+
+		if(this.workerCreator != null)
+			conn.setWorker(this.workerCreator.apply(conn));
 
 		conn.setOnError((e) -> {
 			NetCommon.logSocketError(logger, "Socket Error", conn, e);
@@ -152,9 +148,7 @@ public abstract class TCPClientManager extends ConnectionSelectorHandler impleme
 		}else if(key.isReadable()){
 			byte[] data = conn.read();
 			if(data != null){
-				this.worker.accept(() -> {
-					conn.handleData(data);
-				});
+				conn.handleData(data);
 			}
 		}else if(key.isWritable()){
 			conn.flushWriteBacklog();

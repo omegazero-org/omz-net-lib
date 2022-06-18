@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.omegazero.common.event.Tasks;
 import org.omegazero.common.logging.Logger;
@@ -38,7 +39,6 @@ import org.omegazero.net.nio.util.ConnectionSelectorHandler;
 import org.omegazero.net.server.NetServer;
 import org.omegazero.net.socket.AbstractSocketConnection;
 import org.omegazero.net.socket.SocketConnection;
-import org.omegazero.net.util.SyncWorker;
 
 /**
  * UDP/IP implementation of a {@link NetServer}.
@@ -59,21 +59,13 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 
 	protected final Collection<InetAddress> bindAddresses;
 	protected final Collection<Integer> ports;
-	protected final Consumer<Runnable> worker;
+	protected final Function<SocketConnection, Consumer<Runnable>> workerCreator;
 	private final ByteBuffer receiveBuffer;
 
 	private long idleTimeout;
 
 	private final Map<SocketAddress, ChannelConnection> connections = new HashMap<>();
 	private final List<ChannelConnection> backloggedConnections = new LinkedList<>();
-
-	/**
-	 * 
-	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
-	 */
-	public UDPServer(Collection<Integer> ports) {
-		this(null, ports, null, 60000, 8192);
-	}
 
 	/**
 	 * Constructs a new <code>UDPServer</code> instance.<br>
@@ -84,21 +76,19 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 	 * @param bindAddresses A collection of local addresses to bind to (see {@link ServerSocketChannel#bind(java.net.SocketAddress, int)}). May be <code>null</code> to use an
 	 * automatically assigned address
 	 * @param ports The list of ports to listen on
-	 * @param worker A callback accepting tasks to run that may require increased processing time. May be <code>null</code> to run everything using a single thread
+	 * @param workerCreator The worker creator
 	 * @param idleTimeout The time in milliseconds to keep connections that had no traffic. Metadata for UDP connections not closed using {@link SocketConnection#close()} or by
 	 * this idle timeout will be stored indefinitely, which should be avoided
 	 * @param receiveBufferSize The size of the receive buffer. Should be set to the maximum expected packet size
 	 */
-	public UDPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize) {
+	public UDPServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, Function<SocketConnection, Consumer<Runnable>> workerCreator, long idleTimeout,
+			int receiveBufferSize) {
 		if(bindAddresses != null)
 			this.bindAddresses = bindAddresses;
 		else
 			this.bindAddresses = Arrays.asList((InetAddress) null);
 		this.ports = Objects.requireNonNull(ports, "ports must not be null");
-		if(worker != null)
-			this.worker = worker;
-		else
-			this.worker = new SyncWorker();
+		this.workerCreator = workerCreator;
 		this.receiveBuffer = ByteBuffer.allocate(receiveBufferSize + 1);
 
 		this.setIdleTimeout(idleTimeout);
@@ -195,9 +185,7 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 
 			byte[] data = conn.read();
 			if(data != null){
-				this.worker.accept(() -> {
-					conn.handleData(data);
-				});
+				conn.handleData(data);
 			}
 		}else if(key.isWritable()){
 			boolean allFlushed = true;
@@ -239,6 +227,9 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 				ChannelConnection newConn = this.handleConnection(key, remote);
 
 				newConn.setOnLocalClose(this::onConnectionClosed);
+
+				if(this.workerCreator != null)
+					newConn.setWorker(this.workerCreator.apply(newConn));
 
 				newConn.setOnConnect(() -> {
 					if(UDPServer.this.onNewConnection != null){

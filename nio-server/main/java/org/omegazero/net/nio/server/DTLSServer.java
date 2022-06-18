@@ -17,6 +17,7 @@ import java.net.SocketAddress;
 import java.nio.channels.SelectionKey;
 import java.util.Collection;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
@@ -28,6 +29,7 @@ import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.nio.socket.ChannelConnection;
 import org.omegazero.net.nio.socket.NioTLSConnection;
 import org.omegazero.net.nio.socket.provider.DatagramChannelProvider;
+import org.omegazero.net.socket.SocketConnection;
 
 /**
  * TLS server for UDP sockets (DTLS).
@@ -48,26 +50,16 @@ public class DTLSServer extends UDPServer {
 	 * @param sslContext The SSL context to be used by the server. The context must be initialized with protocol "DTLS"
 	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
 	 */
-	public DTLSServer(Collection<Integer> ports, SSLContext sslContext) {
-		super(ports);
-		this.sslContext = sslContext;
-	}
-
-	/**
-	 * 
-	 * @param sslContext The SSL context to be used by the server. The context must be initialized with protocol "DTLS"
-	 * @see UDPServer#UDPServer(String, Collection, Consumer, long, int)
-	 */
-	public DTLSServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, Consumer<Runnable> worker, long idleTimeout, int receiveBufferSize,
-			SSLContext sslContext) {
-		super(bindAddresses, ports, worker, idleTimeout, receiveBufferSize);
+	public DTLSServer(Collection<InetAddress> bindAddresses, Collection<Integer> ports, Function<SocketConnection, Consumer<Runnable>> workerCreator, long idleTimeout,
+			int receiveBufferSize, SSLContext sslContext) {
+		super(bindAddresses, ports, workerCreator, idleTimeout, receiveBufferSize);
 		this.sslContext = sslContext;
 	}
 
 
 	/**
-	 * Sets the list of supported application layer protocol names to be negotiated using TLS ALPN (Application Layer Protocol Negotiation). The elements in this list should
-	 * be ordered from most-preferred to least-preferred protocol name.<br>
+	 * Sets the list of supported application layer protocol names to be negotiated using TLS ALPN (Application Layer Protocol Negotiation). The elements in this list should be
+	 * ordered from most-preferred to least-preferred protocol name.<br>
 	 * <br>
 	 * If not set or <code>null</code> is passed, the first protocol name presented by the client is selected. If the client does not request ALPN, this list is ignored.
 	 * 

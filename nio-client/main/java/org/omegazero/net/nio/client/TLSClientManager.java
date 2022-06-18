@@ -13,20 +13,17 @@ package org.omegazero.net.nio.client;
 
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
-import java.security.GeneralSecurityException;
-import java.security.cert.X509Certificate;
-import java.util.Collection;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
 
 import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.client.params.TLSConnectionParameters;
 import org.omegazero.net.nio.socket.ChannelConnection;
 import org.omegazero.net.nio.socket.NioTLSConnection;
 import org.omegazero.net.nio.socket.provider.SocketChannelProvider;
-import org.omegazero.net.util.TrustManagerUtil;
+import org.omegazero.net.socket.SocketConnection;
 
 /**
  * TLS client manager for TCP sockets.
@@ -35,44 +32,21 @@ import org.omegazero.net.util.TrustManagerUtil;
  */
 public class TLSClientManager extends TCPClientManager {
 
-	private TrustManager[] trustManagers;
 
-	public TLSClientManager() {
-		this(null, (Collection<X509Certificate>) null);
-	}
+	private final SSLContext sslContext;
 
-	public TLSClientManager(Consumer<Runnable> worker) {
-		this(worker, (Collection<X509Certificate>) null);
-	}
-
-	public TLSClientManager(Consumer<Runnable> worker, Collection<X509Certificate> additionalTrustCertificates) {
+	public TLSClientManager(Function<SocketConnection, Consumer<Runnable>> worker, SSLContext sslContext) {
 		super(worker);
-		try{
-			this.trustManagers = TrustManagerUtil.getTrustManagersWithAdditionalCertificates(additionalTrustCertificates);
-		}catch(GeneralSecurityException | IOException e){
-			throw new RuntimeException("Error while initializing trust manager", e);
-		}
-	}
-
-	public TLSClientManager(Consumer<Runnable> worker, TrustManager[] trustManagers) {
-		super(worker);
-		this.trustManagers = trustManagers;
+		this.sslContext = sslContext;
 	}
 
 
 	@Override
 	protected ChannelConnection createConnection(SelectionKey selectionKey, ConnectionParameters params) throws IOException {
-		try{
-			if(!(params instanceof TLSConnectionParameters))
-				throw new IllegalArgumentException("params must be an instance of " + TLSConnectionParameters.class.getName());
-			TLSConnectionParameters tlsParams = (TLSConnectionParameters) params;
-
-			SSLContext context = SSLContext.getInstance("TLS");
-			context.init(null, this.trustManagers, null);
-			return new NioTLSConnection(selectionKey, new SocketChannelProvider(), params.getRemote(), context, true, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
-		}catch(GeneralSecurityException | IOException e){
-			throw new RuntimeException("Error while creating TLS client connection", e);
-		}
+		if(!(params instanceof TLSConnectionParameters))
+			throw new IllegalArgumentException("params must be an instance of " + TLSConnectionParameters.class.getName());
+		TLSConnectionParameters tlsParams = (TLSConnectionParameters) params;
+		return new NioTLSConnection(selectionKey, new SocketChannelProvider(), params.getRemote(), this.sslContext, true, tlsParams.getAlpnNames(), tlsParams.getSniOptions());
 	}
 
 	@Override

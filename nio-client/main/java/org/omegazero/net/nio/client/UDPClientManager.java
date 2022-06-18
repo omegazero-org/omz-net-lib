@@ -16,6 +16,7 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
@@ -24,7 +25,6 @@ import org.omegazero.net.client.params.ConnectionParameters;
 import org.omegazero.net.nio.socket.ChannelConnection;
 import org.omegazero.net.nio.util.ConnectionSelectorHandler;
 import org.omegazero.net.socket.SocketConnection;
-import org.omegazero.net.util.SyncWorker;
 
 /**
  * UDP/IP implementation of a {@link NetClientManager}.
@@ -36,17 +36,10 @@ public abstract class UDPClientManager extends ConnectionSelectorHandler impleme
 	private static final Logger logger = LoggerUtil.createLogger();
 
 
-	protected final Consumer<Runnable> worker;
+	protected final Function<SocketConnection, Consumer<Runnable>> workerCreator;
 
-	public UDPClientManager() {
-		this(null);
-	}
-
-	public UDPClientManager(Consumer<Runnable> worker) {
-		if(worker != null)
-			this.worker = worker;
-		else
-			this.worker = new SyncWorker();
+	public UDPClientManager(Function<SocketConnection, Consumer<Runnable>> workerCreator) {
+		this.workerCreator = workerCreator;
 	}
 
 
@@ -86,6 +79,9 @@ public abstract class UDPClientManager extends ConnectionSelectorHandler impleme
 
 		conn.setOnLocalClose(super::onConnectionClosed);
 
+		if(this.workerCreator != null)
+			conn.setWorker(this.workerCreator.apply(conn));
+
 		conn.setOnError((e) -> {
 			logger.warn("UDP socket error (remote address=", conn.getRemoteAddress(), "): ", e.toString());
 		});
@@ -109,9 +105,7 @@ public abstract class UDPClientManager extends ConnectionSelectorHandler impleme
 		if(key.isReadable()){
 			byte[] data = conn.read();
 			if(data != null){
-				this.worker.accept(() -> {
-					conn.handleData(data);
-				});
+				conn.handleData(data);
 			}
 		}else if(key.isWritable()){
 			conn.flushWriteBacklog();
