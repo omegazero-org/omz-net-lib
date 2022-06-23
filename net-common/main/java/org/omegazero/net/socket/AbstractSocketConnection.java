@@ -282,9 +282,14 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	}
 
 	private void runOnTimeout() throws Exception {
-		if(this.onTimeout != null)
-			this.onTimeout.run();
-		this.destroy();
+		try{
+			if(this.onTimeout != null)
+				this.onTimeout.run();
+			else if(this.onError != null)
+				this.onError.accept(new java.io.IOException("connect timed out"));
+		}finally{
+			this.destroy();
+		}
 	}
 
 	private void runOnData(byte[] data) throws Exception { // only called when onData is set

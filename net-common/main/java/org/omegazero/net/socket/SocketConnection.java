@@ -246,6 +246,8 @@ public interface SocketConnection extends java.io.Closeable {
 
 	/**
 	 * Sets a callback that is called when the connect operation started using {@link #connect(int)} times out.
+	 * <p>
+	 * If this callback is not set, and a timeout occurs, {@code onError} is called instead. This callback is followed by a {@code onClose} callback in both cases.
 	 * 
 	 * @param onTimeout The callback
 	 */
