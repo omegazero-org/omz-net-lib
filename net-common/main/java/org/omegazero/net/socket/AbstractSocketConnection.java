@@ -216,14 +216,13 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	 * Called by classes managing this {@link SocketConnection} if data was received using {@link #read()}. This method calls the {@code onData} callback.
 	 * 
 	 * @param data The data that was received on this connection
-	 * @return <code>false</code> if no <code>onData</code> handler was set
+	 * @return <code>false</code> if no <code>onData</code> handler was set upon entry of this method
 	 * @see #setOnData(ThrowingConsumer)
 	 */
 	public final boolean handleData(byte[] data) {
-		if(this.onData == null)
-			return false;
+		boolean s = this.onData == null;
 		this.runAsync(this::runOnData, data);
-		return true;
+		return s;
 	}
 
 	/**
@@ -292,8 +291,9 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 		}
 	}
 
-	private void runOnData(byte[] data) throws Exception { // only called when onData is set
-		this.onData.accept(data);
+	private void runOnData(byte[] data) throws Exception {
+		if(this.onData != null)
+			this.onData.accept(data);
 	}
 
 	private void runOnWritable() throws Exception {
