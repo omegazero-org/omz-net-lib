@@ -19,9 +19,11 @@ import org.omegazero.net.socket.SocketConnection;
 public final class NetCommon {
 
 	/**
-	 * The version string of <i>omz-net-lib</i>.<br>
-	 * <br>
+	 * The version string of <i>omz-net-lib</i>.
+	 * <p>
 	 * This value is set by the build CI pipeline based on the event that triggered the build. Otherwise, this string is always <code>"$BUILDVERSION"</code>.
+	 * <p>
+	 * {@link #getVersion()} should be used to retrieve the value to prevent compile-time string inlining.
 	 */
 	public static final String VERSION = "$BUILDVERSION";
 
@@ -56,5 +58,16 @@ public final class NetCommon {
 	public static void logSocketError(Logger logger, String msg, SocketConnection conn, Throwable e) {
 		logger.log(SOCKET_ERROR_DEBUG ? LogLevel.DEBUG : LogLevel.WARN,
 				new Object[] { msg, " (remote address=", conn.getRemoteAddress(), "): ", PRINT_STACK_TRACES ? e : e.toString() });
+	}
+
+
+	/**
+	 * Returns the {@linkplain #VERSION version string}.
+	 * 
+	 * @return The version string
+	 * @since 2.1.0
+	 */
+	public static String getVersion() {
+		return VERSION;
 	}
 }
