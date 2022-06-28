@@ -22,9 +22,6 @@ import org.omegazero.net.socket.SocketConnection;
 public abstract class NetClientManagerBuilder extends NetworkApplicationBuilder {
 
 
-	protected SSLContext sslContext = null;
-
-
 	@Override
 	public abstract NetClientManager build();
 
