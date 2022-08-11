@@ -27,11 +27,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
+import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.spec.EncodedKeySpec;
-import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPrivateCrtKeySpec;
 import java.util.Base64;
@@ -39,7 +38,7 @@ import java.util.Scanner;
 
 
 /**
- * Class for reading a RSA private key from a PEM-formatted string.
+ * Class for reading a RSA or EC private key from a PEM-formatted string.
  * <p>
  * It can read PEM files with PKCS#8 or PKCS#1 encodings. It does not support encrypted PEM files.
  * <p>
@@ -69,39 +68,30 @@ public final class PrivateKeyReader {
 	 * Parses the given PEM-formatted string representing a {@linkplain PrivateKey private key}.
 	 * 
 	 * @return The {@code PrivateKey}
-	 * @throws IOException If the given key string could not be parsed
+	 * @throws IOException If the given key string is malformed
+	 * @throws GeneralSecurityException If the given key string could not be parsed
 	 */
-	public static PrivateKey read(String keyString) throws IOException {
-		KeyFactory factory;
-		try {
-			factory = KeyFactory.getInstance("RSA"); //$NON-NLS-1$
-		} catch (NoSuchAlgorithmException e) {
-			throw new IOException("JCE error: " + e.getMessage()); //$NON-NLS-1$
-		}
-
-		if (keyString.contains(P1_BEGIN_MARKER)) {
+	public static PrivateKey read(String keyString) throws IOException, GeneralSecurityException {
+		if(keyString.contains(P1_BEGIN_MARKER)){
 			byte[] keyBytes = readKeyMaterial(keyString, P1_BEGIN_MARKER, P1_END_MARKER);
 			RSAPrivateCrtKeySpec keySpec = getRSAKeySpec(keyBytes);
-
-			try {
-				return factory.generatePrivate(keySpec);
-			} catch (InvalidKeySpecException e) {
-				throw new IOException("Invalid PKCS#1 PEM file: " + e.getMessage()); //$NON-NLS-1$
+			return KeyFactory.getInstance("RSA").generatePrivate(keySpec);
+		}else if(keyString.contains(P8_BEGIN_MARKER)){
+			byte[] keyBytes = readKeyMaterial(keyString, P8_BEGIN_MARKER, P8_END_MARKER);
+			EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
+			// hacky, but works
+			try{
+				return KeyFactory.getInstance("RSA").generatePrivate(keySpec);
+			}catch(GeneralSecurityException e){
+				try{
+					return KeyFactory.getInstance("EC").generatePrivate(keySpec);
+				}catch(GeneralSecurityException e2){
+					e.addSuppressed(e2);
+				}
+				throw e;
 			}
-        }
-
-        if (keyString.contains(P8_BEGIN_MARKER)) {
-        	byte[] keyBytes = readKeyMaterial(keyString, P8_BEGIN_MARKER, P8_END_MARKER);
-            EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
-
-			try {
-	            return factory.generatePrivate(keySpec);
-			} catch (InvalidKeySpecException e) {
-				throw new IOException("Invalid PKCS#8 PEM file: " + e.getMessage()); //$NON-NLS-1$
-			}
-        }
-      
-        throw new IOException("Invalid PEM file: no begin marker"); //$NON-NLS-1$
+		}else
+			throw new IOException("Invalid PEM file: no begin marker");
 	}
 
 	/**
