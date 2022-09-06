@@ -60,7 +60,7 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 	private long idleTimeout;
 
 	// only required for idle timeouts
-	private final Set<ChannelConnection> connections = new java.util.HashSet<>();
+	private final Set<ChannelConnection> connections = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
 	/**
 	 * Constructs a new <code>TCPServer</code> instance.
@@ -125,15 +125,13 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 				return;
 			long currentTime = System.currentTimeMillis();
 			try{
-				synchronized(this.connections){
-					// originally, this was just an iteration over the selector key set (which would not require the connections list),
-					// but it is apparently impossible to properly synchronize the set, so this needs to be done instead
-					for(ChannelConnection conn : this.connections){
-						long delta = currentTime - conn.getLastIOTime();
-						if(delta < 0 || delta > timeout){
-							logger.debug("Idle Timeout: ", conn.getRemoteAddress(), " (", delta, "ms)");
-							conn.close();
-						}
+				// originally, this was just an iteration over the selector key set (which would not require the connections list),
+				// but it is apparently impossible to properly synchronize the set, so this needs to be done instead
+				for(ChannelConnection conn : this.connections){
+					long delta = currentTime - conn.getLastIOTime();
+					if(delta < 0 || delta > timeout){
+						logger.debug("Idle Timeout: ", conn.getRemoteAddress(), " (", delta, "ms)");
+						conn.close();
 					}
 				}
 			}catch(Exception e){
@@ -164,10 +162,8 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 
 	@Override
 	protected void handleConnectionClosed(AbstractSocketConnection conn) throws IOException {
-		synchronized(this.connections){
-			if(!this.connections.remove(conn))
-				logger.warn("Closed connection to ", conn.getRemoteAddress(), " was not in connections list");
-		}
+		if(!this.connections.remove(conn))
+			logger.warn("Closed connection to ", conn.getRemoteAddress(), " was not in connections list");
 		super.handleConnectionClosed(conn);
 	}
 
@@ -200,9 +196,7 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 
 			this.handleConnectionPost(conn);
 
-			synchronized(this.connections){
-				this.connections.add(conn);
-			}
+			this.connections.add(conn);
 		}else if(key.isReadable()){
 			ChannelConnection conn = (ChannelConnection) key.attachment();
 			byte[] data = conn.read();
