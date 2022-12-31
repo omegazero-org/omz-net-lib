@@ -1,7 +1,5 @@
 package org.omegazero.net.common;
 
-import org.omegazero.net.socket.SocketConnection;
-
 /**
  * Wraps any {@code Throwable} in this unchecked exception, accessible using {@link #getCause()}.
  * <p>
