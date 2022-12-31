@@ -12,9 +12,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import org.omegazero.common.event.EventEmitter;
+import org.omegazero.common.event.runnable.GenericRunnable;
 import org.omegazero.common.util.SimpleAttachmentContainer;
-import org.omegazero.common.util.function.ThrowingConsumer;
-import org.omegazero.common.util.function.ThrowingRunnable;
 import org.omegazero.net.common.UnhandledException;
 import org.omegazero.net.util.SyncWorker;
 
@@ -26,12 +26,18 @@ import org.omegazero.net.util.SyncWorker;
  */
 public abstract class AbstractSocketConnection extends SimpleAttachmentContainer implements SocketConnection {
 
-	private ThrowingRunnable onConnect;
-	private ThrowingRunnable onTimeout;
-	private ThrowingConsumer<byte[]> onData;
-	private ThrowingRunnable onWritable;
-	private ThrowingRunnable onClose;
-	private Consumer<Throwable> onError;
+	protected static final int EV_CONNECT = 0;
+	protected static final int EV_TIMEOUT = 1;
+	protected static final int EV_DATA = 2;
+	protected static final int EV_WRITABLE = 3;
+	protected static final int EV_CLOSE = 4;
+	protected static final int EV_ERROR = 5;
+
+	/**
+	 * The event emitter used for events.
+	 */
+	protected final EventEmitter eventEmitter;
+
 	private Consumer<AbstractSocketConnection> onLocalConnect;
 	private Consumer<AbstractSocketConnection> onLocalClose;
 
@@ -51,6 +57,20 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	 * Lock for write operations.
 	 */
 	protected final Object writeLock = new Object();
+
+	/**
+	 * Creates a new {@code AbstractSocketConnection}.
+	 */
+	public AbstractSocketConnection(){
+		this.eventEmitter = new EventEmitter();
+		this.eventEmitter.reserveEventIdSpace(5);
+		this.eventEmitter.createEventId("connect", EV_CONNECT);
+		this.eventEmitter.createEventId("timeout", EV_TIMEOUT);
+		this.eventEmitter.createEventId("data", EV_DATA);
+		this.eventEmitter.createEventId("writable", EV_WRITABLE);
+		this.eventEmitter.createEventId("close", EV_CLOSE);
+		this.eventEmitter.createEventId("error", EV_ERROR);
+	}
 
 
 	@Override
@@ -74,33 +94,21 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 
 
 	@Override
-	public final void setOnConnect(ThrowingRunnable onConnect) {
-		this.onConnect = onConnect;
+	public final SocketConnection on(String event, GenericRunnable runnable){
+		this.eventEmitter.on(event, runnable);
+		return this;
 	}
 
 	@Override
-	public final void setOnTimeout(ThrowingRunnable onTimeout) {
-		this.onTimeout = onTimeout;
+	public final SocketConnection once(String event, GenericRunnable runnable){
+		this.eventEmitter.once(event, runnable);
+		return this;
 	}
 
 	@Override
-	public final void setOnData(ThrowingConsumer<byte[]> onData) {
-		this.onData = onData;
-	}
-
-	@Override
-	public final void setOnWritable(ThrowingRunnable onWritable) {
-		this.onWritable = onWritable;
-	}
-
-	@Override
-	public final void setOnClose(ThrowingRunnable onClose) {
-		this.onClose = onClose;
-	}
-
-	@Override
-	public final void setOnError(Consumer<Throwable> onError) {
-		this.onError = onError;
+	public final SocketConnection off(String event, GenericRunnable runnable){
+		this.eventEmitter.off(event, runnable);
+		return this;
 	}
 
 
@@ -128,7 +136,7 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	}
 
 	/**
-	 * Sets the worker for this {@code AbstractSocketConnection}. This worker is used to run all callbacks except {@code onError} and may be used to run the callbacks in a
+	 * Sets the worker for this {@code AbstractSocketConnection}. This worker is used to run all events except {@code error} and may be used to run the callbacks in a
 	 * different thread.
 	 * <p>
 	 * The worker must execute all tasks in the order they were given and should not execute tasks concurrently.
@@ -204,41 +212,42 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	}
 
 
-	public final void handleConnect() {
+	/**
+	 * Called internally, by subclasses or by classes managing this {@code SocketConnection} if this socket connects. This method calls the {@code connect} event.
+	 */
+	public final void handleConnect(){
 		this.runAsync(this::runOnConnect);
 	}
 
-	public final void handleTimeout() {
+	/**
+	 * Called internally, by subclasses or by classes managing this {@code SocketConnection} if a connection attempt times out. This method calls the {@code timeout} event.
+	 */
+	public final void handleTimeout(){
 		this.runAsync(this::runOnTimeout);
 	}
 
 	/**
-	 * Called by classes managing this {@link SocketConnection} if data was received using {@link #read()}. This method calls the {@code onData} callback.
+	 * Called by classes managing this {@link SocketConnection} if data was received using {@link #read()}. This method calls the {@code data} event.
 	 * 
 	 * @param data The data that was received on this connection
-	 * @return <code>false</code> if no <code>onData</code> handler was set upon entry of this method
-	 * @see #setOnData(ThrowingConsumer)
+	 * @return <code>false</code> if no {@code data} event handler was set upon entry of this method
 	 */
 	public final boolean handleData(byte[] data) {
-		boolean s = this.onData == null;
+		boolean s = this.eventEmitter.getEventListenerCount("data") > 0;
 		this.runAsync(this::runOnData, data);
 		return s;
 	}
 
 	/**
-	 * Called by subclasses if this socket is writable. This method calls the {@code onWritable} callback.
-	 * 
-	 * @see #setOnWritable(ThrowingRunnable)
+	 * Called by subclasses if this socket is writable. This method calls the {@code writable} event.
 	 */
 	public final void handleWritable() {
 		this.runAsync(this::runOnWritable);
 	}
 
 	/**
-	 * Called by subclasses or classes managing this {@link SocketConnection} if this connection closed. This method calls the {@code onClose} callback on the first invocation of
+	 * Called by subclasses or classes managing this {@link SocketConnection} if this connection closed. This method calls the {@code close} event on the first invocation of
 	 * this method.
-	 * 
-	 * @see #setOnClose(ThrowingRunnable)
 	 */
 	public final void handleClose() {
 		synchronized(this){
@@ -251,20 +260,17 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 
 
 	/**
-	 * Called by subclasses or classes managing this {@link SocketConnection} if an error occurred in a callback. This method calls the {@code onError} callback and
+	 * Called by subclasses or classes managing this {@link SocketConnection} if an error occurred in a callback. This method calls the {@code error} event and
 	 * {@linkplain #destroy() forcibly closes} this connection.
 	 * <p>
 	 * Unlike the other {@code handle} methods, this method always runs synchronously.
 	 * 
 	 * @param e The error
-	 * @throws UnhandledException If no {@code onError} handler is set
-	 * @see #setOnError(Consumer)
+	 * @throws UnhandledException If no {@code error} event handler is set
 	 */
 	public final void handleError(Throwable e) {
 		try{
-			if(this.onError != null){
-				this.onError.accept(e);
-			}else
+			if(this.eventEmitter.runEvent(EV_ERROR, e) == 0)
 				throw new UnhandledException(e);
 		}finally{
 			this.destroy();
@@ -272,44 +278,39 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	}
 
 
-	private void runOnConnect() throws Exception {
+	private void runOnConnect(){
 		this.flushWriteQueue();
-		if(this.onConnect != null)
-			this.onConnect.run();
+		this.eventEmitter.runEvent(EV_CONNECT);
 		if(this.isWritable())
 			this.runOnWritable();
 	}
 
-	private void runOnTimeout() throws Exception {
+	private void runOnTimeout(){
 		try{
-			if(this.onTimeout != null)
-				this.onTimeout.run();
-			else if(this.onError != null)
-				this.onError.accept(new java.io.IOException("connect timed out"));
+			if(this.eventEmitter.runEvent(EV_TIMEOUT) == 0)
+				this.eventEmitter.runEvent(EV_ERROR, new java.io.IOException("connect timed out"));
 		}finally{
 			this.destroy();
 		}
 	}
 
-	private void runOnData(byte[] data) throws Exception {
-		if(this.onData != null)
-			this.onData.accept(data);
+	private void runOnData(byte[] data){
+		this.eventEmitter.runEvent(EV_DATA, data);
 	}
 
-	private void runOnWritable() throws Exception {
+	private void runOnWritable(){
 		// onWritable can happen before onConnect, for example when flushing the write backlog, but that should be suppressed
 		// this is called anyway in handleConnect if socket is writable
-		if(this.hasConnected() && this.onWritable != null)
-			this.onWritable.run();
+		if(this.hasConnected())
+			this.eventEmitter.runEvent(EV_WRITABLE);
 	}
 
-	private void runOnClose() throws Exception {
-		if(this.onClose != null)
-			this.onClose.run();
+	private void runOnClose(){
+		this.eventEmitter.runEvent(EV_CLOSE);
 	}
 
 
-	protected final void runAsync(ThrowingRunnable runnable) {
+	protected final void runAsync(Runnable runnable) {
 		this.worker.accept(() -> {
 			try{
 				runnable.run();
@@ -319,7 +320,7 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 		});
 	}
 
-	protected final <T> void runAsync(ThrowingConsumer<T> runnable, T value) {
+	protected final <T> void runAsync(Consumer<T> runnable, T value) {
 		this.worker.accept(() -> {
 			try{
 				runnable.accept(value);

@@ -9,6 +9,7 @@ package org.omegazero.net.socket;
 import java.net.SocketAddress;
 import java.util.function.Consumer;
 
+import org.omegazero.common.event.runnable.GenericRunnable;
 import org.omegazero.common.util.function.ThrowingConsumer;
 import org.omegazero.common.util.function.ThrowingRunnable;
 
@@ -18,8 +19,11 @@ import org.omegazero.common.util.function.ThrowingRunnable;
  * {@code SocketConnection}s are usually managed by another class in this library, either an implementation representing a server or a client. These classes are responsible for
  * calling the callbacks set in this object.
  * <p>
+ * The callbacks registered by applications are named events. The applications registers event handler callbacks using {@link #on(String, GenericRunnable)}. A list of valid event names
+ * for this {@code SocketConnection} is listed in the documentation of this method.
+ * <p>
  * None of the methods in this interface throw any checked exceptions. Exceptions in most callbacks or IO operations are caught internally by the implementation and passed to the
- * {@code onError} callback, which is one of the few callbacks that can and should not throw an exception itself. After an error, the connection is forcibly closed.
+ * {@code error} event handlers, which is one of the few callbacks that can and should not throw an exception itself. After an error, the connection is forcibly closed.
  * <p>
  * Implementations should inherit from {@link AbstractSocketConnection}, because it already contains several implemented methods and utility methods.
  * 
@@ -35,12 +39,11 @@ public interface SocketConnection extends java.io.Closeable {
 	 * <p>
 	 * Whether this method is blocking is implementation-defined.
 	 * <p>
-	 * A connection timeout in milliseconds may be specified in the <b>timeout</b> parameter. If the connection has not been established within this timeout, the handler set using
-	 * {@link #setOnTimeout(Runnable)} is called and the connection is closed, and if this method is blocking, it will return. Depending on the implementation and underlying
-	 * protocol, a timeout may occur earlier or never and may instead cause the <code>onError</code> callback to be called.
+	 * A connection timeout in milliseconds may be specified in the <b>timeout</b> parameter. If the connection has not been established within this timeout, the {@code timeout} event
+	 * is emitted and the connection is closed, and if this method is blocking, it will return. Depending on the implementation and underlying
+	 * protocol, a timeout may occur earlier or never and may instead cause the <code>error</code> event to be emitted.
 	 * 
 	 * @param timeout The connection timeout in milliseconds. Disabled if 0
-	 * @see #setOnWritable(ThrowingRunnable)
 	 */
 	public abstract void connect(int timeout);
 
@@ -76,9 +79,9 @@ public interface SocketConnection extends java.io.Closeable {
 	 * Writes data to this connection for delivery to the peer host.
 	 * <p>
 	 * Whether this method is blocking is implementation-defined. A call to this method may store data in a temporary write buffer if the underlying socket is busy. An application
-	 * should try to respect the value of {@link #isWritable()} to reduce memory consumption by such write buffer if a lot of data is being written.
+	 * should try to respect the value of {@link #isWritable()} to reduce memory consumption by such write buffer if a lot of data is being written (see also: {@code writable} event).
 	 * <p>
-	 * If this method is called before the <code>onConnect</code> event, the data is queued in a temporary buffer and written out when the socket connects.
+	 * If this method is called before the {@code connect} event, the data is queued in a temporary buffer and written out when the socket connects.
 	 * 
 	 * @param data The data to write
 	 * @param offset The start index of the data to write in the <b>data</b> byte array
@@ -87,7 +90,6 @@ public interface SocketConnection extends java.io.Closeable {
 	 * @since 1.5
 	 * @see #write(byte[])
 	 * @see #writeQueue(byte[], int, int)
-	 * @see #setOnWritable(ThrowingRunnable)
 	 */
 	public abstract void write(byte[] data, int offset, int length);
 
@@ -187,9 +189,9 @@ public interface SocketConnection extends java.io.Closeable {
 	public abstract boolean isConnected();
 
 	/**
-	 * Returns <code>true</code> if the <i>onConnect</i> event has ever executed. This is already <code>true</code> while running the event.
+	 * Returns <code>true</code> if the {@code connect} event has ever executed. This is already <code>true</code> while running the event.
 	 * 
-	 * @return <code>true</code> if the <i>onConnect</i> event has ever fired
+	 * @return <code>true</code> if the {@code connect} event has ever been emitted
 	 */
 	public abstract boolean hasConnected();
 
@@ -212,7 +214,7 @@ public interface SocketConnection extends java.io.Closeable {
 
 	/**
 	 * Enables or disables read blocking. If set to <code>true</code>, the implementation will attempt to block incoming data from being processed and delay it until this is set to
-	 * <code>false</code> again. Note that the implementation may still fire <code>onData</code> events while this option is set to <code>true</code>.
+	 * <code>false</code> again. Note that the implementation may still emit {@code data} events while this option is set to <code>true</code>.
 	 * 
 	 * @param block Whether to attempt to block incoming data
 	 */
@@ -238,11 +240,70 @@ public interface SocketConnection extends java.io.Closeable {
 
 
 	/**
+	 * Adds an event listener for the given <b>event</b>.
+	 * <p>
+	 * The following events exist:
+	 * <ul>
+		<li>{@code connect()}: Called when this socket is connected and ready to receive or send data.</li>
+		<li>{@code timeout()}: Called when the connect operation started using {@link #connect(int)} times out. If no listener is registered for this event, and a timeout occurs,
+				an {@code error} event is emitted instead. This event is followed by a {@code close} event in both cases.</li>
+		<li>{@code data(byte[])}: Called when data is received on this connection.</li>
+		<li>{@code writable()}: Called when this socket is ready for writing after a {@link #write(byte[])} or {@link #connect(int)} operation. This event is not emitted if the
+			socket was previously already writable. This event is also not emitted during a <code>write(byte[])</code> call to allow the event handler to safely call that method without being
+			called again synchronously.</li>
+		<li>{@code close()}: Called when this connection closes and can no longer receive or send data.</li>
+		<li>{@code error(Throwable)}: Called when an error occurs on this connection. This event is usually followed by a {@code close} event.</li>
+	 * </ul>
+	 * <p>
+	 * An example for registering an event handler for the {@code data} event:
+	 * <pre><code>
+		connection.on("data", (GenericRunnable.A1&lt;byte[]&gt;) (data) -> {
+			// ....
+		});
+	 * </code></pre>
+	 *
+	 * @param event The event name
+	 * @param runnable The callback
+	 * @return This {@code SocketConnection}
+	 * @since 2.2.0
+	 */
+	public SocketConnection on(String event, GenericRunnable runnable);
+
+	/**
+	 * Adds a single-event event listener for the given <b>event</b>. Event listeners registered using this method are only called once, the next time the event is emitted,
+	 * and are then unregistered.
+	 *
+	 * @param event The event name
+	 * @param runnable The callback
+	 * @return This {@code SocketConnection}
+	 * @throws UnsupportedOperationException If single-event event listeners are not supported
+	 * @since 2.2.0
+	 */
+	public SocketConnection once(String event, GenericRunnable runnable);
+
+	/**
+	 * Removes an event listener previously registered using {@link #on(String, GenericRunnable)}.
+	 *
+	 * @param event The event name
+	 * @param runnable The callback to remove
+	 * @return This {@code SocketConnection}
+	 * @since 2.2.0
+	 */
+	public SocketConnection off(String event, GenericRunnable runnable);
+
+
+	/**
 	 * Sets a callback that is called when this socket is connected and ready to receive or send data.
 	 * 
 	 * @param onConnect The callback
+	 * @deprecated Since 2.2.0, use {@link #on(String, GenericRunnable)} instead
 	 */
-	public void setOnConnect(ThrowingRunnable onConnect);
+	@Deprecated
+	public default void setOnConnect(ThrowingRunnable onConnect){
+		this.on("connect", (GenericRunnable.A0) () -> {
+			onConnect.run();
+		});
+	}
 
 	/**
 	 * Sets a callback that is called when the connect operation started using {@link #connect(int)} times out.
@@ -250,15 +311,27 @@ public interface SocketConnection extends java.io.Closeable {
 	 * If this callback is not set, and a timeout occurs, {@code onError} is called instead. This callback is followed by a {@code onClose} callback in both cases.
 	 * 
 	 * @param onTimeout The callback
+	 * @deprecated Since 2.2.0, use {@link #on(String, GenericRunnable)} instead
 	 */
-	public void setOnTimeout(ThrowingRunnable onTimeout);
+	@Deprecated
+	public default void setOnTimeout(ThrowingRunnable onTimeout){
+		this.on("timeout", (GenericRunnable.A0) () -> {
+			onTimeout.run();
+		});
+	}
 
 	/**
 	 * Sets a callback that is called when data is received on this connection.
 	 * 
 	 * @param onData The callback
+	 * @deprecated Since 2.2.0, use {@link #on(String, GenericRunnable)} instead
 	 */
-	public void setOnData(ThrowingConsumer<byte[]> onData);
+	@Deprecated
+	public default void setOnData(ThrowingConsumer<byte[]> onData){
+		this.on("data", (GenericRunnable.A1<byte[]>) (data) -> {
+			onData.accept(data);
+		});
+	}
 
 	/**
 	 * Sets a callback that is called when this socket is ready for writing after a {@link #write(byte[])} or {@link #connect(int)} operation. This event is not called if the
@@ -266,15 +339,27 @@ public interface SocketConnection extends java.io.Closeable {
 	 * called again synchronously.
 	 * 
 	 * @param onWritable The callback
+	 * @deprecated Since 2.2.0, use {@link #on(String, GenericRunnable)} instead
 	 */
-	public void setOnWritable(ThrowingRunnable onWritable);
+	@Deprecated
+	public default void setOnWritable(ThrowingRunnable onWritable){
+		this.on("writable", (GenericRunnable.A0) () -> {
+			onWritable.run();
+		});
+	}
 
 	/**
 	 * Sets a callback that is called when this connection closes and can no longer receive or send data.
 	 * 
 	 * @param onClose The callback
+	 * @deprecated Since 2.2.0, use {@link #on(String, GenericRunnable)} instead
 	 */
-	public void setOnClose(ThrowingRunnable onClose);
+	@Deprecated
+	public default void setOnClose(ThrowingRunnable onClose){
+		this.on("close", (GenericRunnable.A0) () -> {
+			onClose.run();
+		});
+	}
 
 	/**
 	 * Sets a callback that is called when an error occurs on this connection.
@@ -282,6 +367,12 @@ public interface SocketConnection extends java.io.Closeable {
 	 * This callback is usually followed by a <code>onClose</code> (set using {@link SocketConnection#setOnClose(Runnable)}) callback.
 	 * 
 	 * @param onError The callback
+	 * @deprecated Since 2.2.0, use {@link #on(String, GenericRunnable)} instead
 	 */
-	public void setOnError(Consumer<Throwable> onError);
+	@Deprecated
+	public default void setOnError(Consumer<Throwable> onError){
+		this.on("error", (GenericRunnable.A1<Throwable>) (error) -> {
+			onError.accept(error);
+		});
+	}
 }
