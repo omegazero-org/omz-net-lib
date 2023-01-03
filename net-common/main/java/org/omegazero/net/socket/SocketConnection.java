@@ -257,7 +257,7 @@ public interface SocketConnection extends java.io.Closeable {
 	 * <p>
 	 * An example for registering an event handler for the {@code data} event:
 	 * <pre><code>
-		connection.on("data", (GenericRunnable.A1&lt;byte[]&gt;) (data) -> {
+		connection.on("data", (byte[] data) -> {
 			// ....
 		});
 	 * </code></pre>
@@ -291,6 +291,36 @@ public interface SocketConnection extends java.io.Closeable {
 	 */
 	public SocketConnection off(String event, GenericRunnable runnable);
 
+	/**
+	 * Adds an event listener for the given <b>event</b>.
+	 * <p>
+	 * Alias for {@link #on(String, GenericRunnable)}, for zero-argument events.
+	 *
+	 * @param event The event name
+	 * @param runnable The callback
+	 * @return This {@code SocketConnection}
+	 * @since 2.2.0
+	 */
+	public default SocketConnection on(String event, GenericRunnable.A0 runnable){
+		this.on(event, (GenericRunnable) runnable);
+		return this;
+	}
+
+	/**
+	 * Adds an event listener for the given <b>event</b>.
+	 * <p>
+	 * Alias for {@link #on(String, GenericRunnable)}, for single-argument events.
+	 *
+	 * @param event The event name
+	 * @param runnable The callback
+	 * @return This {@code SocketConnection}
+	 * @since 2.2.0
+	 */
+	public default SocketConnection on(String event, GenericRunnable.A1<?> runnable){
+		this.on(event, (GenericRunnable) runnable);
+		return this;
+	}
+
 
 	/**
 	 * Sets a callback that is called when this socket is connected and ready to receive or send data.
@@ -300,7 +330,7 @@ public interface SocketConnection extends java.io.Closeable {
 	 */
 	@Deprecated
 	public default void setOnConnect(ThrowingRunnable onConnect){
-		this.on("connect", (GenericRunnable.A0) () -> {
+		this.on("connect", () -> {
 			onConnect.run();
 		});
 	}
@@ -315,7 +345,7 @@ public interface SocketConnection extends java.io.Closeable {
 	 */
 	@Deprecated
 	public default void setOnTimeout(ThrowingRunnable onTimeout){
-		this.on("timeout", (GenericRunnable.A0) () -> {
+		this.on("timeout", () -> {
 			onTimeout.run();
 		});
 	}
@@ -328,7 +358,7 @@ public interface SocketConnection extends java.io.Closeable {
 	 */
 	@Deprecated
 	public default void setOnData(ThrowingConsumer<byte[]> onData){
-		this.on("data", (GenericRunnable.A1<byte[]>) (data) -> {
+		this.on("data", (byte[] data) -> {
 			onData.accept(data);
 		});
 	}
@@ -343,7 +373,7 @@ public interface SocketConnection extends java.io.Closeable {
 	 */
 	@Deprecated
 	public default void setOnWritable(ThrowingRunnable onWritable){
-		this.on("writable", (GenericRunnable.A0) () -> {
+		this.on("writable", () -> {
 			onWritable.run();
 		});
 	}
@@ -356,7 +386,7 @@ public interface SocketConnection extends java.io.Closeable {
 	 */
 	@Deprecated
 	public default void setOnClose(ThrowingRunnable onClose){
-		this.on("close", (GenericRunnable.A0) () -> {
+		this.on("close", () -> {
 			onClose.run();
 		});
 	}
@@ -371,7 +401,7 @@ public interface SocketConnection extends java.io.Closeable {
 	 */
 	@Deprecated
 	public default void setOnError(Consumer<Throwable> onError){
-		this.on("error", (GenericRunnable.A1<Throwable>) (error) -> {
+		this.on("error", (Throwable error) -> {
 			onError.accept(error);
 		});
 	}

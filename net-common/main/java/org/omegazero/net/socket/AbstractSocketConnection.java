@@ -112,16 +112,36 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	}
 
 
+	/**
+	 * Called by classes managing this {@code SocketConnection}.
+	 *
+	 * @param onLocalClose The onLocalClose callback
+	 */
 	public final void setOnLocalClose(Consumer<AbstractSocketConnection> onLocalClose) {
 		if(this.onLocalClose != null)
 			throw new IllegalStateException("onLocalClose is already set");
 		this.onLocalClose = onLocalClose;
 	}
 
+	/**
+	 * Called by classes managing this {@code SocketConnection}.
+	 *
+	 * @param onLocalConnect The onLocalConnect callback
+	 */
 	public final void setOnLocalConnect(Consumer<AbstractSocketConnection> onLocalConnect) {
 		if(this.onLocalConnect != null)
 			throw new IllegalStateException("onLocalConnect is already set");
 		this.onLocalConnect = onLocalConnect;
+	}
+
+	/**
+	 * Called by classes managing this {@code SocketConnection}.
+	 *
+	 * @param runnable The callback
+	 * @since 2.2.0
+	 */
+	public final void setDefaultErrorListener(GenericRunnable.A1<Throwable> runnable){
+		this.eventEmitter.setDefaultEventListener("error", runnable);
 	}
 
 
