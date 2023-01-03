@@ -50,7 +50,7 @@ public class PlainUDPServer extends UDPServer {
 	protected ChannelConnection handleConnection(SelectionKey serverKey, SocketAddress remote) throws IOException {
 		ChannelConnection conn = new NioPlaintextConnection(serverKey, new DatagramChannelProvider(remote, super::writeBacklogStarted), remote);
 
-		conn.setOnError((e) -> {
+		conn.setDefaultErrorListener((Throwable e) -> {
 			if(e instanceof IOException)
 				NetCommon.logSocketError(logger, "UDP Socket Error", conn, e);
 			else

@@ -82,7 +82,7 @@ public class TLSServer extends TCPServer {
 		ChannelConnection conn = new NioTLSConnection(selectionKey, new SocketChannelProvider(), this.sslContext, false, this.supportedApplicationLayerProtocols);
 
 		// see note in PlainTCPServer
-		conn.setOnError((e) -> {
+		conn.setDefaultErrorListener((Throwable e) -> {
 			if(e instanceof SSLHandshakeException)
 				NetCommon.logSocketError(logger, "TLS handshake failed", conn, e);
 			else if(e instanceof SSLException)

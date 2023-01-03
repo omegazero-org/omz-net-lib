@@ -22,6 +22,7 @@ import org.omegazero.common.logging.Logger;
 import org.omegazero.common.logging.LoggerUtil;
 import org.omegazero.net.client.NetClientManager;
 import org.omegazero.net.client.params.ConnectionParameters;
+import org.omegazero.net.common.NetCommon;
 import org.omegazero.net.nio.socket.ChannelConnection;
 import org.omegazero.net.nio.util.ConnectionSelectorHandler;
 import org.omegazero.net.socket.SocketConnection;
@@ -82,8 +83,8 @@ public abstract class UDPClientManager extends ConnectionSelectorHandler impleme
 		if(this.workerCreator != null)
 			conn.setWorker(this.workerCreator.apply(conn));
 
-		conn.setOnError((e) -> {
-			logger.warn("UDP socket error (remote address=", conn.getRemoteAddress(), "): ", e.toString());
+		conn.setDefaultErrorListener((Throwable e) -> {
+			NetCommon.logSocketError(logger, "UDP Socket Error", conn, e);
 		});
 
 		if(params.getLocal() != null)

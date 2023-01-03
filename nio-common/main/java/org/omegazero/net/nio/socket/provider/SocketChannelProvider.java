@@ -32,7 +32,7 @@ public class SocketChannelProvider implements ChannelProvider {
 
 	private SocketChannel socket;
 
-	private long connectTimeout = -1;
+	private Object connectTimeout;
 
 
 	@Override
@@ -52,20 +52,19 @@ public class SocketChannelProvider implements ChannelProvider {
 			this.selectionKey.interestOps(SelectionKey.OP_CONNECT);
 			this.selectionKey.selector().wakeup();
 			if(timeout > 0)
-				this.connectTimeout = Tasks.timeout((args) -> {
+				this.connectTimeout = Tasks.I.timeout((args) -> {
 					if(!SocketChannelProvider.this.connection.hasConnected()){
 						SocketChannelProvider.this.connection.handleTimeout();
 						SocketChannelProvider.this.connection.destroy();
 					}
-				}, timeout).daemon().getId();
+				}, timeout).daemon();
 		}
 		return imm;
 	}
 
 	@Override
 	public void close() throws IOException {
-		if(this.connectTimeout >= 0)
-			Tasks.clear(this.connectTimeout);
+		Tasks.I.clear(this.connectTimeout);
 		synchronized(this.selectionKey){
 			this.socket.close();
 		}

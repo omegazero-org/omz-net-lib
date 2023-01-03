@@ -83,7 +83,7 @@ public class DTLSServer extends UDPServer {
 		ChannelConnection conn = new NioTLSConnection(serverKey, new DatagramChannelProvider(remote, super::writeBacklogStarted), remote, this.sslContext, false,
 				this.supportedApplicationLayerProtocols, null);
 
-		conn.setOnError((e) -> {
+		conn.setDefaultErrorListener((Throwable e) -> {
 			if(e instanceof SSLHandshakeException)
 				NetCommon.logSocketError(logger, "TLS handshake failed", conn, e);
 			else if(e instanceof SSLException)

@@ -99,7 +99,7 @@ public abstract class TCPClientManager extends ConnectionSelectorHandler impleme
 		if(this.workerCreator != null)
 			conn.setWorker(this.workerCreator.apply(conn));
 
-		conn.setOnError((e) -> {
+		conn.setDefaultErrorListener((Throwable e) -> {
 			NetCommon.logSocketError(logger, "Socket Error", conn, e);
 		});
 

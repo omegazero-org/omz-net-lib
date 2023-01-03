@@ -52,7 +52,7 @@ public class PlainTCPServer extends TCPServer {
 		// this is to handle errors that happen before another error handler was set, for example because a TLS handshake error occurred
 		// and there was no way to set another error handler because the onConnect was not called yet
 		// this may also be used as the default error handler by the application if no additional action is required other than terminating the connection
-		conn.setOnError((e) -> {
+		conn.setDefaultErrorListener((Throwable e) -> {
 			if(e instanceof IOException)
 				NetCommon.logSocketError(logger, "Socket Error", conn, e);
 			else

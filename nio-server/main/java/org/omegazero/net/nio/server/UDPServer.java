@@ -18,7 +18,6 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.ServerSocketChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -54,7 +53,7 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 
 	private List<DatagramChannel> serverChannels = new ArrayList<>();
 
-	private long connectionTimeoutCheckInterval;
+	private Object connectionTimeoutCheckInterval;
 
 
 	protected final Collection<InetAddress> bindAddresses;
@@ -132,7 +131,7 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 	public void init() throws IOException {
 		this.listen();
 
-		this.connectionTimeoutCheckInterval = Tasks.interval((args) -> {
+		this.connectionTimeoutCheckInterval = Tasks.I.interval((args) -> {
 			long timeout = UDPServer.this.idleTimeout;
 			long currentTime = System.currentTimeMillis();
 			try{
@@ -153,12 +152,12 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 			}catch(Exception e){
 				logger.warn("Error while checking idle timeouts: ", e.toString());
 			}
-		}, 5000).getId();
+		}, 5000);
 	}
 
 	@Override
 	public void close() throws IOException {
-		Tasks.clear(this.connectionTimeoutCheckInterval);
+		Tasks.I.clear(this.connectionTimeoutCheckInterval);
 		for(DatagramChannel dc : this.serverChannels){
 			dc.close();
 		}
@@ -231,7 +230,7 @@ public abstract class UDPServer extends ConnectionSelectorHandler implements Net
 				if(this.workerCreator != null)
 					newConn.setWorker(this.workerCreator.apply(newConn));
 
-				newConn.setOnConnect(() -> {
+				newConn.on("connect", () -> {
 					if(UDPServer.this.onNewConnection != null){
 						UDPServer.this.onNewConnection.accept(newConn);
 					}else

@@ -49,7 +49,7 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 
 	private List<ServerSocketChannel> serverSockets = new ArrayList<>();
 
-	private long connectionTimeoutCheckInterval;
+	private Object connectionTimeoutCheckInterval;
 
 
 	protected final Collection<InetAddress> bindAddresses;
@@ -118,7 +118,7 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 	public void init() throws IOException {
 		this.listen();
 
-		this.connectionTimeoutCheckInterval = Tasks.interval((args) -> {
+		this.connectionTimeoutCheckInterval = Tasks.I.interval((args) -> {
 			// still need to check for idle timeout even if it wasn't configured because it may change during runtime
 			long timeout = TCPServer.this.idleTimeout;
 			if(timeout <= 0)
@@ -137,12 +137,12 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 			}catch(Exception e){
 				logger.warn("Error while checking idle timeouts: ", e.toString());
 			}
-		}, 5000).getId();
+		}, 5000);
 	}
 
 	@Override
 	public void close() throws IOException {
-		Tasks.clear(this.connectionTimeoutCheckInterval);
+		Tasks.I.clear(this.connectionTimeoutCheckInterval);
 		for(ServerSocketChannel ssc : this.serverSockets){
 			ssc.close();
 		}
@@ -187,7 +187,7 @@ public abstract class TCPServer extends ConnectionSelectorHandler implements Net
 			if(this.workerCreator != null)
 				conn.setWorker(this.workerCreator.apply(conn));
 
-			conn.setOnConnect(() -> {
+			conn.on("connect", () -> {
 				if(TCPServer.this.onNewConnection != null){
 					TCPServer.this.onNewConnection.accept(conn);
 				}else
