@@ -26,11 +26,29 @@ import org.omegazero.net.util.SyncWorker;
  */
 public abstract class AbstractSocketConnection extends SimpleAttachmentContainer implements SocketConnection {
 
+	/**
+	 * Event ID of the {@code connect} event.
+	 */
 	protected static final int EV_CONNECT = 0;
+	/**
+	 * Event ID of the {@code timeout} event.
+	 */
 	protected static final int EV_TIMEOUT = 1;
+	/**
+	 * Event ID of the {@code data} event.
+	 */
 	protected static final int EV_DATA = 2;
+	/**
+	 * Event ID of the {@code writable} event.
+	 */
 	protected static final int EV_WRITABLE = 3;
+	/**
+	 * Event ID of the {@code close} event.
+	 */
 	protected static final int EV_CLOSE = 4;
+	/**
+	 * Event ID of the {@code error} event.
+	 */
 	protected static final int EV_ERROR = 5;
 
 	/**
@@ -233,21 +251,21 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 
 
 	/**
-	 * Called internally, by subclasses or by classes managing this {@code SocketConnection} if this socket connects. This method calls the {@code connect} event.
+	 * Called internally, by subclasses or by classes managing this {@code SocketConnection} when this socket connects. This method calls the {@code connect} event.
 	 */
 	public final void handleConnect(){
 		this.runAsync(this::runOnConnect);
 	}
 
 	/**
-	 * Called internally, by subclasses or by classes managing this {@code SocketConnection} if a connection attempt times out. This method calls the {@code timeout} event.
+	 * Called internally, by subclasses or by classes managing this {@code SocketConnection} when a connection attempt times out. This method calls the {@code timeout} event.
 	 */
 	public final void handleTimeout(){
 		this.runAsync(this::runOnTimeout);
 	}
 
 	/**
-	 * Called by classes managing this {@link SocketConnection} if data was received using {@link #read()}. This method calls the {@code data} event.
+	 * Called by classes managing this {@link SocketConnection} when data was received using {@link #read()}. This method calls the {@code data} event.
 	 * 
 	 * @param data The data that was received on this connection
 	 * @return <code>false</code> if no {@code data} event handler was set upon entry of this method
@@ -259,14 +277,14 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	}
 
 	/**
-	 * Called by subclasses if this socket is writable. This method calls the {@code writable} event.
+	 * Called by subclasses when this socket is writable. This method calls the {@code writable} event.
 	 */
 	public final void handleWritable() {
 		this.runAsync(this::runOnWritable);
 	}
 
 	/**
-	 * Called by subclasses or classes managing this {@link SocketConnection} if this connection closed. This method calls the {@code close} event on the first invocation of
+	 * Called by subclasses or classes managing this {@link SocketConnection} when this connection closed. This method calls the {@code close} event on the first invocation of
 	 * this method.
 	 */
 	public final void handleClose() {
@@ -280,7 +298,7 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 
 
 	/**
-	 * Called by subclasses or classes managing this {@link SocketConnection} if an error occurred in a callback. This method calls the {@code error} event and
+	 * Called by subclasses or classes managing this {@link SocketConnection} when an error occurred in a callback. This method calls the {@code error} event and
 	 * {@linkplain #destroy() forcibly closes} this connection.
 	 * <p>
 	 * Unlike the other {@code handle} methods, this method always runs synchronously.
@@ -330,6 +348,11 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	}
 
 
+	/**
+	 * Delegates the given {@code Runnable} to this {@code AbstractSocketConnection}'s worker.
+	 *
+	 * @param runnable The runnable
+	 */
 	protected final void runAsync(Runnable runnable) {
 		this.worker.accept(() -> {
 			try{
@@ -340,6 +363,12 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 		});
 	}
 
+	/**
+	 * Delegates the given {@code Consumer} to this {@code AbstractSocketConnection}'s worker.
+	 *
+	 * @param runnable The consumer
+	 * @param value The value to pass to the consumer
+	 */
 	protected final <T> void runAsync(Consumer<T> runnable, T value) {
 		this.worker.accept(() -> {
 			try{

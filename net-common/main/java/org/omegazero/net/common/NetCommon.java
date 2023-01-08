@@ -28,20 +28,20 @@ public final class NetCommon {
 	public static final String VERSION = "$BUILDVERSION";
 
 	/**
-	 * System property <code>org.omegazero.net.printStackTraces</code><br>
-	 * <br>
-	 * Whether the full stack trace of a socket error should be printed instead of just the error message.<br>
-	 * <br>
+	 * System property <code>org.omegazero.net.printStackTraces</code>
+	 * <p>
+	 * Whether the full stack trace of a socket error should be printed instead of just the error message.
+	 * <p>
 	 * <b>Default:</b> <code>false</code>
 	 */
 	public static final boolean PRINT_STACK_TRACES = PropertyUtil.getBoolean("org.omegazero.net.printStackTraces", false);
 
 	/**
-	 * System property <code>org.omegazero.net.socketErrorDebug</code><br>
-	 * <br>
+	 * System property <code>org.omegazero.net.socketErrorDebug</code>
+	 * <p>
 	 * Whether the default socket error handler should print socket error messages with log level <i>DEBUG</i> instead of <i>WARN</i>. This may be used to reduce log noise on
-	 * public-facing servers where there may be many misbehaving clients connecting to it.<br>
-	 * <br>
+	 * public-facing servers where there may be many misbehaving clients connecting to it.
+	 * <p>
 	 * <b>Default:</b> <code>false</code>
 	 */
 	public static final boolean SOCKET_ERROR_DEBUG = PropertyUtil.getBoolean("org.omegazero.net.socketErrorDebug", false);

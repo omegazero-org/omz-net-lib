@@ -23,7 +23,7 @@ import org.omegazero.common.util.function.ThrowingRunnable;
  * for this {@code SocketConnection} is listed in the documentation of this method.
  * <p>
  * None of the methods in this interface throw any checked exceptions. Exceptions in most callbacks or IO operations are caught internally by the implementation and passed to the
- * {@code error} event handlers, which is one of the few callbacks that can and should not throw an exception itself. After an error, the connection is forcibly closed.
+ * {@code error} event handlers, which is one of the few callbacks that should not throw an exception itself. After an error, the connection is forcibly closed.
  * <p>
  * Implementations should inherit from {@link AbstractSocketConnection}, because it already contains several implemented methods and utility methods.
  * 
@@ -394,7 +394,7 @@ public interface SocketConnection extends java.io.Closeable {
 	/**
 	 * Sets a callback that is called when an error occurs on this connection.
 	 * <p>
-	 * This callback is usually followed by a <code>onClose</code> (set using {@link SocketConnection#setOnClose(Runnable)}) callback.
+	 * This callback is usually followed by a <code>onClose</code> callback.
 	 * 
 	 * @param onError The callback
 	 * @deprecated Since 2.2.0, use {@link #on(String, GenericRunnable)} instead
