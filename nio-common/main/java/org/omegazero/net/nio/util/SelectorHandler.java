@@ -146,7 +146,7 @@ public abstract class SelectorHandler {
 	}
 
 
-	private synchronized void rebuildSelector() {
+	private synchronized void rebuildSelector(boolean destroy) {
 		try{
 			Selector newSelector = Selector.open();
 			Set<SelectionKey> keys = this.selectorKeys();
@@ -158,7 +158,10 @@ public abstract class SelectorHandler {
 					Object att = key.attachment();
 					int ops = key.interestOps();
 					key.cancel();
-					channel.register(newSelector, ops, att);
+					if(!destroy)
+						channel.register(newSelector, ops, att);
+					else if(channel.isOpen())
+						channel.close();
 				}
 			}
 			this.selector.close();
@@ -180,8 +183,9 @@ public abstract class SelectorHandler {
 	}
 
 	/**
-	 * 
-	 * @return The set of registered {@link SelectionKey}s. See {@link Selector#keys()}
+	 * Returns the set of registered {@link SelectionKey}s. See {@link Selector#keys()}.
+	 *
+	 * @return The set of selection keys
 	 */
 	protected Set<SelectionKey> selectorKeys() {
 		return this.selector.keys();
@@ -234,8 +238,10 @@ public abstract class SelectorHandler {
 				selectorRebuilds++;
 				if(SELECTOR_REBUILDS_MAX > 0 && selectorRebuilds > SELECTOR_REBUILDS_MAX)
 					throw new IOException("Maximum selector rebuild count exceeded: " + selectorRebuilds);
-				logger.warn("Selector.select() has returned prematurely ", selectorSpins, " times in a row, rebuilding");
-				this.rebuildSelector();
+				boolean destroy = selectorRebuilds == SELECTOR_REBUILDS_MAX;
+				logger.warn("Selector.select() has returned prematurely ", selectorSpins, " times in a row, ", destroy ? "destroying channels" : "rebuilding",
+						" (", selectorRebuilds, " of ", SELECTOR_REBUILDS_MAX, ")");
+				this.rebuildSelector(destroy);
 				selectorSpins = 0;
 			}
 		}
