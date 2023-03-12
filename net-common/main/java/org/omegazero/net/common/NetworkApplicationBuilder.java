@@ -112,6 +112,19 @@ public abstract class NetworkApplicationBuilder {
 		return this;
 	}
 
+	/**
+	 * Sets an implementation specific configuration parameter.
+	 *
+	 * @param option The name of the parameter
+	 * @param value The value
+	 * @throws IllegalArgumentException If the given parameter name is not valid
+	 * @since 2.2.1
+	 * @implNote By default, this method always throws an {@code IllegalArgumentException}
+	 */
+	public NetworkApplicationBuilder set(String option, Object value) {
+		throw new IllegalArgumentException("Invalid option '" + option + "'");
+	}
+
 
 	private static <T extends NetworkApplicationBuilder> Class<? extends T> resolveBuilder(String implName, String typeName, Class<T> type) {
 		String className;

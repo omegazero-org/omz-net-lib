@@ -45,4 +45,9 @@ public abstract class NetClientManagerBuilder extends NetworkApplicationBuilder 
 	public NetClientManagerBuilder sslContext(SSLContext sslContext) {
 		return (NetClientManagerBuilder) super.sslContext(sslContext);
 	}
+
+	@Override
+	public NetClientManagerBuilder set(String option, Object value) {
+		return (NetClientManagerBuilder) super.set(option, value);
+	}
 }

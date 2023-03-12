@@ -57,6 +57,11 @@ public abstract class NetServerBuilder extends NetworkApplicationBuilder {
 		return (NetServerBuilder) super.sslContext(sslContext);
 	}
 
+	@Override
+	public NetServerBuilder set(String option, Object value) {
+		return (NetServerBuilder) super.set(option, value);
+	}
+
 
 	/**
 	 * Sets the local addresses the server should bind to.
