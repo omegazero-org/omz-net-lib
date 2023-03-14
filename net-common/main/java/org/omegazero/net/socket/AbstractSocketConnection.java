@@ -234,18 +234,22 @@ public abstract class AbstractSocketConnection extends SimpleAttachmentContainer
 	 * 
 	 * @param data The data
 	 */
-	protected final synchronized void queueWrite(byte[] data) {
-		if(this.writeQueue != null)
-			this.writeQueue.add(data);
-		else
-			throw new IllegalStateException("Tried to queue write after connection finished");
+	protected final void queueWrite(byte[] data) {
+		synchronized(this.writeLock){
+			if(this.writeQueue != null)
+				this.writeQueue.add(data);
+			else
+				throw new IllegalStateException("Tried to queue write after connection finished");
+		}
 	}
 
-	private synchronized void flushWriteQueue() {
-		List<byte[]> wq = this.writeQueue;
-		this.writeQueue = null;
-		for(byte[] d : wq){
-			this.write(d);
+	private void flushWriteQueue() {
+		synchronized(this.writeLock){
+			List<byte[]> wq = this.writeQueue;
+			this.writeQueue = null;
+			for(byte[] d : wq){
+				this.write(d);
+			}
 		}
 	}
 

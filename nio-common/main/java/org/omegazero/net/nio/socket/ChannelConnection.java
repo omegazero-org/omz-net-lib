@@ -48,7 +48,7 @@ public abstract class ChannelConnection extends AbstractSocketConnection {
 	private Deque<byte[]> writeBacklog = new LinkedList<>();
 	private ByteBuffer writeBufTemp;
 	private boolean pendingClose = false;
-	private boolean closed = false;
+	private boolean localClose = false;
 
 	public ChannelConnection(SelectionKey selectionKey, ChannelProvider provider) throws IOException {
 		this(selectionKey, provider, null);
@@ -95,9 +95,9 @@ public abstract class ChannelConnection extends AbstractSocketConnection {
 	 */
 	protected void close0() {
 		synchronized(this){
-			if(this.closed)
+			if(this.localClose)
 				return;
-			this.closed = true;
+			this.localClose = true;
 		}
 		super.localClose();
 		try{
@@ -133,7 +133,7 @@ public abstract class ChannelConnection extends AbstractSocketConnection {
 
 	@Override
 	public final void close() {
-		if(!this.closed && !this.flush()) // data still pending
+		if(!this.localClose && !this.flush()) // data still pending
 			this.pendingClose = true;
 		else
 			this.close0();
@@ -309,7 +309,7 @@ public abstract class ChannelConnection extends AbstractSocketConnection {
 		if(data != null && (offset < 0 || offset + length > data.length))
 			throw new IllegalArgumentException("offset=" + offset + " length=" + length + " data.length=" + data.length);
 		try{
-			synchronized(this){
+			synchronized(this.writeLock){
 				if(!super.hasConnected()){
 					if(data != null && length > 0){
 						if(offset == 0 && length == data.length)
@@ -319,8 +319,6 @@ public abstract class ChannelConnection extends AbstractSocketConnection {
 					}
 					return;
 				}
-			}
-			synchronized(super.writeLock){
 				if(!flush && targetBuffer.remaining() >= length){
 					targetBuffer.put(data, offset, length);
 				}else if(data != null && length > 0){
