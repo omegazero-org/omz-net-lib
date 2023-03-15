@@ -95,6 +95,8 @@ public class SocketChannelProvider implements ChannelProvider {
 
 	@Override
 	public void setReadBlock(boolean block) {
+		if((this.selectionKey.interestOps() & SelectionKey.OP_CONNECT) != 0)
+			return;
 		if(block)
 			this.disableOp(SelectionKey.OP_READ);
 		else
