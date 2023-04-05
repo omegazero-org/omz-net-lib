@@ -215,9 +215,12 @@ public abstract class SelectorHandler {
 					Iterator<SelectionKey> iterator = this.selector.selectedKeys().iterator();
 					while(iterator.hasNext()){
 						SelectionKey key = iterator.next();
-						synchronized(key){
+						try{
 							if(key.isValid())
 								this.handleSelectedKey(key);
+						}catch(java.nio.channels.CancelledKeyException e){
+							// this is a bit funky, though the alternative would be to replace this try-catch with a synchronized(key) which causes all sorts of (locking) problems
+							logger.debug("CancelledKeyException thrown in handleSelectedKey: ", e);
 						}
 						iterator.remove();
 					}
