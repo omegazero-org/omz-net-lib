@@ -39,8 +39,8 @@ public class NioPlaintextConnection extends ChannelConnection {
 
 	@Override
 	protected void createBuffers() {
-		super.readBuf = ByteBuffer.allocate(8192);
-		super.writeBuf = ByteBuffer.allocate(8192);
+		super.readBuf = ByteBuffer.allocateDirect(8192);
+		super.writeBuf = ByteBuffer.allocateDirect(8192);
 	}
 
 
