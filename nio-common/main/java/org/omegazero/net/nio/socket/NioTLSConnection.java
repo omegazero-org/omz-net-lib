@@ -125,15 +125,10 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 
 	@Override
 	protected void createBuffers() {
-		super.readBuf = ByteBuffer.allocate(this.sslEngine.getSession().getPacketBufferSize());
-		// no idea why but apparently SSLEngine requires a massive buffer for DTLS even though it only writes less than 100 bytes, otherwise BUFFER_OVERFLOW
-		super.writeBuf = ByteBuffer.allocate(this.sslEngine.getSession().getPacketBufferSize() * 2);
-		// the * 2 here is when a large packet has been read from readBuf and there is the start of the next (large) packet in the readBuf, but it is incomplete
-		// (because both packets are near maximum TLS packet size and dont fit in readBuf together), the SSLEngine will report BUFFER_OVERFLOW because it (presumably)
-		// detects that there wouldnt be enough space in readBufUnwrapped for the next large packet, even though it isnt even fully received yet
-		// (BUFFER_UNDERFLOW would be better in that case)
-		this.readBufUnwrapped = ByteBuffer.allocate(this.sslEngine.getSession().getApplicationBufferSize() * 2);
-		this.writeBufUnwrapped = ByteBuffer.allocate(this.sslEngine.getSession().getApplicationBufferSize());
+		super.readBuf = ByteBuffer.allocateDirect(this.sslEngine.getSession().getPacketBufferSize() >> 3);
+		super.writeBuf = ByteBuffer.allocateDirect(this.sslEngine.getSession().getPacketBufferSize());
+		this.readBufUnwrapped = ByteBuffer.allocateDirect(this.sslEngine.getSession().getApplicationBufferSize() >> 3);
+		this.writeBufUnwrapped = ByteBuffer.allocateDirect(this.sslEngine.getSession().getApplicationBufferSize() >> 2);
 	}
 
 
@@ -182,8 +177,8 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 	}
 
 	private void writeWrapped() throws IOException {
+		super.writeBuf.clear();
 		while(this.writeBufUnwrapped.hasRemaining()){
-			super.writeBuf.clear();
 			int beforeDataLen = this.writeBufUnwrapped.remaining();
 			SSLEngineResult result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
 			if(result.getStatus() == Status.OK){
@@ -195,6 +190,9 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 					throw new IOException("writeBuf is empty after wrap");
 				}
 				super.writeToSocket();
+				super.writeBuf.clear();
+			}else if(result.getStatus() == Status.BUFFER_OVERFLOW){
+				this.increaseBufferSize(3);
 			}else
 				throw new SSLException("Write SSL wrap failed: " + result.getStatus());
 		}
@@ -241,6 +239,31 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 	}
 
 
+	private void increaseBufferSize(int which) throws BufferOverflowException {
+		if(which == 0){
+			assert Thread.holdsLock(super.readLock);
+			this.readBufUnwrapped = this.increaseBufferSize0(this.readBufUnwrapped, this.sslEngine.getSession().getApplicationBufferSize() << 1, 3);
+		}else if(which == 1){
+			this.writeBufUnwrapped = this.increaseBufferSize0(this.writeBufUnwrapped, this.sslEngine.getSession().getApplicationBufferSize(), 1);
+		}else if(which == 2){
+			assert Thread.holdsLock(super.readLock);
+			super.readBuf = this.increaseBufferSize0(super.readBuf, this.sslEngine.getSession().getPacketBufferSize(), 1);
+		}else if(which == 3){
+			super.writeBuf = this.increaseBufferSize0(super.writeBuf, this.sslEngine.getSession().getPacketBufferSize() << 1, 1);
+		}else
+			throw new IllegalArgumentException("which == " + which);
+	}
+
+	private ByteBuffer increaseBufferSize0(ByteBuffer buf, int maxSize, int increase2Pow) throws BufferOverflowException {
+		if(buf.capacity() >= maxSize)
+			throw new BufferOverflowException();
+		int newSize = Math.min(maxSize, buf.capacity() << increase2Pow);
+		ByteBuffer newBuf = ByteBuffer.allocateDirect(newSize);
+		buf.flip();
+		newBuf.put(buf);
+		return newBuf;
+	}
+
 	private void closeOutbound() {
 		this.sslEngine.closeOutbound();
 		if(super.isConnected()){
@@ -248,9 +271,13 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 				try{
 					int count = 0;
 					SSLEngineResult result;
+					super.writeBuf.clear();
 					do{
-						super.writeBuf.clear();
 						result = this.sslEngine.wrap(this.writeBufUnwrapped, super.writeBuf);
+						if(result.getStatus() == Status.BUFFER_OVERFLOW){
+							this.increaseBufferSize(3);
+							continue;
+						}
 						super.writeBuf.flip();
 						int written = super.writeToSocket();
 						logger.debug("Wrote SSL close message (", written, " bytes, status ", result.getStatus(), ")");
@@ -258,7 +285,8 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 							logger.warn("Wrote ", count, " SSL close messages to ", this.getRemoteAddress(), ", aborting");
 							break;
 						}
-					}while(result.getStatus() == Status.OK);
+						super.writeBuf.clear();
+					}while(result.getStatus() == Status.OK || result.getStatus() == Status.BUFFER_OVERFLOW);
 				}catch(IOException e){
 					logger.debug("Error while writing SSL close message: ", e.toString());
 				}
@@ -267,6 +295,7 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 	}
 
 	private byte[] readApplicationData() throws IOException {
+		assert Thread.holdsLock(super.readLock);
 		this.readBufUnwrapped.clear();
 		while(super.readBuf.hasRemaining()){
 			int beforeDataLen = super.readBuf.remaining();
@@ -280,12 +309,15 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 				continue;
 			}else if(result.getStatus() == Status.BUFFER_UNDERFLOW){
 				break;
+			}else if(result.getStatus() == Status.BUFFER_OVERFLOW){
+				this.increaseBufferSize(0);
 			}else
 				throw new SSLException("Read SSL unwrap failed: " + result.getStatus());
 		}
 		super.readBuf.compact();
-		if(!super.readBuf.hasRemaining()) // the engine requires more data than the buffer can hold (shouldnt happen because buffer is the maximum size of a TLS packet)
-			throw new BufferOverflowException();
+		if(!super.readBuf.hasRemaining()){
+			this.increaseBufferSize(2);
+		}
 		this.readBufUnwrapped.flip();
 		if(this.readBufUnwrapped.hasRemaining()){
 			byte[] a = new byte[this.readBufUnwrapped.remaining()];
@@ -296,6 +328,7 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 	}
 
 	public void doTLSHandshake() throws IOException {
+		assert Thread.holdsLock(super.readLock);
 		if(this.handshakeComplete)
 			throw new IllegalStateException("Handshake is already completed");
 		HandshakeStatus status = this.sslEngine.getHandshakeStatus();
@@ -313,10 +346,13 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 				super.readBuf.flip();
 				SSLEngineResult result = this.sslEngine.unwrap(super.readBuf, this.readBufUnwrapped);
 				super.readBuf.compact();
-				if(!super.readBuf.hasRemaining())
-					throw new BufferOverflowException();
+				if(!super.readBuf.hasRemaining()){
+					this.increaseBufferSize(2);
+				}
 				if(result.getStatus() == Status.BUFFER_UNDERFLOW) // wait for more data
 					return;
+				else if(result.getStatus() == Status.BUFFER_OVERFLOW)
+					this.increaseBufferSize(0);
 				else if(result.getStatus() != Status.OK)
 					throw new SSLHandshakeException("Unexpected status after SSL unwrap: " + result.getStatus());
 				else if(super.readBuf.remaining() <= beforeRemaining && !statusNUA) // no data is read from readBuf at NEED_UNWRAP_AGAIN
@@ -328,6 +364,8 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 				if(result.getStatus() == Status.OK){
 					super.writeBuf.flip();
 					super.writeToSocket();
+				}else if(result.getStatus() == Status.BUFFER_OVERFLOW){
+					this.increaseBufferSize(3);
 				}else
 					throw new SSLHandshakeException("Unexpected status after SSL wrap: " + result.getStatus());
 				status = this.sslEngine.getHandshakeStatus();
