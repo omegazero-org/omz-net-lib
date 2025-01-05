@@ -29,7 +29,7 @@
 		},
 		"links": [
 			"https://docs.oracle.com/javase/8/docs/api/",
-			"https://docs.omegazero.org/javadoc/omz-java-lib/"
+			"https://docs.warpcs.org/javadoc/omz-java-lib/"
 		],
 		"dependencies": [
 			"omz/org.omegazero.common:omz-common:latest"
