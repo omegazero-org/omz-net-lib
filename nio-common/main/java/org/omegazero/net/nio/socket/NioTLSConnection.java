@@ -125,7 +125,7 @@ public class NioTLSConnection extends ChannelConnection implements TLSConnection
 
 	@Override
 	protected void createBuffers() {
-		super.readBuf = ByteBuffer.allocateDirect(this.sslEngine.getSession().getPacketBufferSize() >> 3);
+		super.readBuf = ByteBuffer.allocateDirect(this.sslEngine.getSession().getPacketBufferSize() >> ("DTLS".equals(this.sslContext.getProtocol()) ? 0 : 3));
 		super.writeBuf = ByteBuffer.allocateDirect(this.sslEngine.getSession().getPacketBufferSize());
 		this.readBufUnwrapped = ByteBuffer.allocateDirect(this.sslEngine.getSession().getApplicationBufferSize() >> 3);
 		this.writeBufUnwrapped = ByteBuffer.allocateDirect(this.sslEngine.getSession().getApplicationBufferSize() >> 2);
