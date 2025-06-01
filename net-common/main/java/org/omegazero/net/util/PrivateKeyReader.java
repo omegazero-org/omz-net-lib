@@ -19,11 +19,12 @@
  * All credits go to Zhang, the original author.
  * 
  * Modifications:
- * Copyright (C) 2022 omegazero.org, user94729
+ * Copyright (C) 2025 Wilton Arthur Poth
  ****************************************************************************/
 package org.omegazero.net.util;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
@@ -57,7 +58,10 @@ public final class PrivateKeyReader {
 	public static final String P8_BEGIN_MARKER 
 		= "-----BEGIN PRIVATE KEY"; //$NON-NLS-1$
 	public static final String P8_END_MARKER
-    	= "-----END PRIVATE KEY"; //$NON-NLS-1$
+		= "-----END PRIVATE KEY"; //$NON-NLS-1$
+
+	public static final String SEC1_BEGIN_MARKER = "-----BEGIN EC PRIVATE KEY";
+	public static final String SEC1_END_MARKER = "-----END EC PRIVATE KEY";
 
 
 	private PrivateKeyReader() {
@@ -90,9 +94,43 @@ public final class PrivateKeyReader {
 				}
 				throw e;
 			}
+		}else if(keyString.contains(SEC1_BEGIN_MARKER)){
+			byte[] keyBytes = readKeyMaterial(keyString, SEC1_BEGIN_MARKER, SEC1_END_MARKER);
+			EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(sec1ToPkcs8EcKey(keyBytes));
+			return KeyFactory.getInstance("EC").generatePrivate(keySpec);
 		}else
 			throw new IOException("Invalid PEM file: no begin marker");
 	}
+
+	private static byte[] sec1ToPkcs8EcKey(byte[] key) throws IOException {
+		DerParser parser = new DerParser(key);
+		Asn1Object sequence = parser.read();
+		if(sequence.getType() != DerParser.SEQUENCE)
+			throw new IOException("sec1ToPkcs8EcKey: Expected SEQUENCE");
+		parser = sequence.getParser();
+		parser.read(); // skip version
+		parser.read(); // skip private key data
+		Asn1Object cons0 = parser.read();
+		if(!(cons0.isConstructed() && cons0.getType() == 0))
+			throw new IOException("sec1ToPkcs8EcKey: Expected cons 0 in SEQUENCE");
+		parser = cons0.getParser();
+		Asn1Object paramsobj = parser.read();
+		if(paramsobj.getType() != DerParser.OBJECT_IDENTIFIER)
+			throw new IOException("sec1ToPkcs8EcKey: Expected OBJECT_IDENTIFIER in SEQUENCE -> cons 0");
+		byte[] params = paramsobj.getValue();
+		ByteArrayOutputStream pkcs8bytes = new ByteArrayOutputStream();
+		pkcs8bytes.write(0x30);
+		pkcs8bytes.write(0x81);
+		pkcs8bytes.write(0x13 + params.length + key.length);
+		pkcs8bytes.write(new byte[] { 0x02, 0x01, 0x00, 0x30, (byte) (11 + params.length), 0x06, 0x07, 0x2A, (byte) 0x86, 0x48, (byte) 0xCE, 0x3D, 0x02, 0x01, 0x06 });
+		pkcs8bytes.write(params.length);
+		pkcs8bytes.write(params);
+		pkcs8bytes.write(new byte[] { 0x04, (byte) 0x81 });
+		pkcs8bytes.write(key.length);
+		pkcs8bytes.write(key);
+		return pkcs8bytes.toByteArray();
+	}
+
 
 	/**
 	 * Read the PEM file and convert it into binary DER stream
